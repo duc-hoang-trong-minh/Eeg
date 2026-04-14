@@ -16,6 +16,7 @@ from .defense.lightweight import (
     suppress_flagged_atoms,
 )
 from .model_oracle import load_eegnet_checkpoint, make_score_fn
+from .stealthiness import channel_sparsity, covariance_frob_distance, psd_deviation
 
 
 def _build_attack_from_config(score_fn, baseline_cfg: BaselineConfig, cfg: AttackConfig, seed: int):
@@ -318,6 +319,9 @@ def _evaluate_single_config(
     margin_deltas = []
     queries = []
     flagged_counts = []
+    cov_frobs = []
+    ch_sparsities = []
+    psd_devs = []
 
     for offset, row in enumerate(candidate_rows):
         idx = int(row["idx"])
@@ -346,6 +350,13 @@ def _evaluate_single_config(
             n_windows=cfg.n_windows,
         )
         filtered_pred = int(np.argmax(score_fn(filtered_x)))
+        bandpass_x = bandpass_filter_defense(
+            result.x_adv,
+            low_hz=baseline_cfg.filter_low_hz,
+            high_hz=baseline_cfg.filter_high_hz,
+            sfreq=baseline_cfg.sfreq,
+        )
+        bandpass_pred = int(np.argmax(score_fn(bandpass_x)))
 
         sample_row = {
             "rank": offset,
@@ -362,8 +373,12 @@ def _evaluate_single_config(
             "support": result.support,
             "delta_l2": float(np.linalg.norm(result.delta.reshape(-1))),
             "delta_linf": float(np.max(np.abs(result.delta))),
+            "cov_frob": covariance_frob_distance(x_np, result.x_adv),
+            "channel_sparsity": channel_sparsity(result.delta),
+            "psd_deviation": psd_deviation(x_np, result.x_adv, baseline_cfg.sfreq),
             "post_denoise_success": bool(denoised_pred != y_int),
             "post_suspicious_filter_success": bool(filtered_pred != y_int),
+            "post_bandpass_filter_success": bool(bandpass_pred != y_int),
             "flagged_atoms": len(flagged_atoms),
         }
         per_sample.append(sample_row)
@@ -371,11 +386,15 @@ def _evaluate_single_config(
         n_success += int(sample_row["success"])
         n_success_after_denoise += int(sample_row["post_denoise_success"])
         n_success_after_filter += int(sample_row["post_suspicious_filter_success"])
+        n_success_after_bandpass += int(sample_row["post_bandpass_filter_success"])
         n_budget_exhausted += int(sample_row["budget_exhausted"])
         margins.append(sample_row["final_margin"])
         margin_deltas.append(sample_row["margin_delta"])
         queries.append(sample_row["queries_used"])
         flagged_counts.append(sample_row["flagged_atoms"])
+        cov_frobs.append(sample_row["cov_frob"])
+        ch_sparsities.append(sample_row["channel_sparsity"])
+        psd_devs.append(sample_row["psd_deviation"])
 
     denom = max(len(candidate_rows), 1)
     best_attack = None
@@ -396,11 +415,15 @@ def _evaluate_single_config(
         "attack_success_rate": n_success / denom,
         "post_denoise_attack_success_rate": n_success_after_denoise / denom,
         "post_suspicious_filter_attack_success_rate": n_success_after_filter / denom,
+        "post_bandpass_filter_attack_success_rate": n_success_after_bandpass / denom,
         "budget_exhaustion_rate": n_budget_exhausted / denom,
         "avg_final_margin": float(np.mean(margins)) if margins else 0.0,
         "avg_margin_reduction": float(np.mean(margin_deltas)) if margin_deltas else 0.0,
         "avg_queries": float(np.mean(queries)) if queries else 0.0,
         "avg_flagged_atoms": float(np.mean(flagged_counts)) if flagged_counts else 0.0,
+        "avg_cov_frob": float(np.mean(cov_frobs)) if cov_frobs else 0.0,
+        "avg_channel_sparsity": float(np.mean(ch_sparsities)) if ch_sparsities else 0.0,
+        "avg_psd_deviation": float(np.mean(psd_devs)) if psd_devs else 0.0,
         "best_attack": best_attack,
         "per_sample": per_sample,
     }

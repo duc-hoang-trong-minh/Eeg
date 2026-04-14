@@ -25,6 +25,7 @@ class DatasetBundle:
     input_window_samples: int
     class_names: tuple[str, ...]
     split_summary: dict[str, object]
+    valid_subjects: np.ndarray = None  # subject ID per valid trial (len == len(valid_set))
 
 
 def _extract_shape_and_classes(windows_dataset, targets: np.ndarray) -> tuple[int, int, int]:
@@ -478,6 +479,8 @@ def load_moabb_windows(cfg: BaselineConfig) -> DatasetBundle:
         train_set = AugmentedDataset(train_set, cfg)
 
     n_chans, n_classes, input_window_samples = _extract_shape_and_classes(windows_dataset, targets)
+    subject_values = metadata["subject"].to_numpy(copy=False) if "subject" in metadata.columns else None
+    valid_subjects = subject_values[valid_idx] if subject_values is not None else None
     return DatasetBundle(
         train_set=train_set,
         valid_set=valid_set,
@@ -486,4 +489,5 @@ def load_moabb_windows(cfg: BaselineConfig) -> DatasetBundle:
         input_window_samples=input_window_samples,
         class_names=class_names,
         split_summary=split_summary,
+        valid_subjects=valid_subjects,
     )

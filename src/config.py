@@ -85,6 +85,23 @@ class AttackConfig:
 
 
 @dataclass
+class GeneratorConfig:
+    support_budget_k: int = 5
+    basis_rank_r: int = 4
+    n_windows: int = 8
+    basis_min_hz: float = 2.0
+    basis_max_hz: float = 30.0
+    basis_mode: str = "hybrid"
+    basis_phase_count: int = 2
+    max_coeff_abs: float = 0.75
+    n_epochs: int = 100
+    lr: float = 1e-3
+    batch_size: int = 32
+    train_fraction: float = 0.8
+    scope: str = "subject"  # "subject" or "model"
+
+
+@dataclass
 class OutputConfig:
     root: Path = Path("outputs")
     baseline_model_name: str = "eegconformer_baseline.pt"
