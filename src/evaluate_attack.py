@@ -10,6 +10,7 @@ from .attack.losses import untargeted_margin
 from .config import AttackConfig, BaselineConfig, OutputConfig
 from .data import load_moabb_windows
 from .defense.lightweight import (
+    bandpass_filter_defense,
     flag_suspicious_atoms_from_signal,
     localized_denoise,
     suppress_flagged_atoms,
@@ -311,6 +312,7 @@ def _evaluate_single_config(
     n_success = 0
     n_success_after_denoise = 0
     n_success_after_filter = 0
+    n_success_after_bandpass = 0
     n_budget_exhausted = 0
     margins = []
     margin_deltas = []

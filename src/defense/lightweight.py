@@ -1,6 +1,24 @@
 from __future__ import annotations
 
 import numpy as np
+from scipy.signal import butter, filtfilt
+
+
+def bandpass_filter_defense(
+    x: np.ndarray,
+    low_hz: float = 4.0,
+    high_hz: float = 40.0,
+    sfreq: float = 128.0,
+    order: int = 5,
+) -> np.ndarray:
+    """Butterworth bandpass preprocessing defense (mirrors Filter_Attack's FilterLayer).
+
+    Retains only frequencies in [low_hz, high_hz]. Triggers living inside this
+    band survive; out-of-band perturbations are suppressed.
+    """
+    nyq = sfreq / 2.0
+    b, a = butter(order, [low_hz / nyq, high_hz / nyq], btype="bandpass")
+    return filtfilt(b, a, x, axis=-1).astype(np.float32)
 
 
 def localized_denoise(x: np.ndarray, kernel_size: int = 5) -> np.ndarray:

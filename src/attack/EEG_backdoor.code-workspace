@@ -1,0 +1,18 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		}
+	],
+	"settings": {
+		"git.ignoreLimitWarning": true,
+		"python-envs.defaultEnvManager": "ms-python.python:venv",
+		"python-envs.defaultPackageManager": "ms-python.python:pip",
+		"chat.tools.terminal.autoApprove": {
+			"/^cd /home/necphy/ducjunior/EEG_backdoor && python3 -m compileall src$/": {
+				"approve": true,
+				"matchCommandLine": true
+			}
+		}
+	}
+}
