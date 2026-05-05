@@ -1,0 +1,209 @@
+% ============================================================
+% GENERAL WRITING RULES FOR THE NEXT PROMPT
+% ============================================================
+%
+% This paper should be written as a communications paper first,
+% not as an ML implementation note. The writing must feel smooth,
+% causal, and reader-oriented.
+%
+% ------------------------------------------------------------
+% 1. ALWAYS PLAN THE LOGIC BEFORE WRITING
+% ------------------------------------------------------------
+%
+% Do not start from equations or code structure.
+% Start from the reader's perspective:
+%
+%   Why is this module needed?
+%   What problem does it solve in the system?
+%   What is the design scheme?
+%   Then write the math.
+%
+% The exposition should always follow:
+%
+%   motivation -> design idea -> formalization -> interpretation
+%
+% not:
+%
+%   notation -> equations -> scattered explanation
+%
+% ------------------------------------------------------------
+% 2. KEEP A SYSTEM-LEVEL CAUSAL FLOW
+% ------------------------------------------------------------
+%
+% Every subsection should read like part of one causal chain.
+% The writing should make the reader feel that each next object
+% appears naturally because the previous one requires it.
+%
+% In particular:
+%
+% - first explain the role of the module in the communication chain;
+% - then explain the design choice used to realize that role;
+% - then present the equations;
+% - then give one short interpretation sentence.
+%
+% The reader should never feel that an equation appears "from nowhere."
+%
+% ------------------------------------------------------------
+% 3. DO NOT EXPLAIN EVERYTHING AT ONCE
+% ------------------------------------------------------------
+%
+% Each paragraph should do one job only.
+%
+% A good paragraph should usually do one of these:
+%
+% - motivate a design need,
+% - define one object,
+% - explain one mechanism,
+% - state one tradeoff,
+% - interpret one equation block.
+%
+% Avoid paragraphs that mix motivation, notation, implementation,
+% and result interpretation all together.
+%
+% ------------------------------------------------------------
+% 4. KEEP SECTIONS IN THEIR NATURAL ROLE
+% ------------------------------------------------------------
+%
+% Each section should stay disciplined.
+%
+% - Section I should motivate the problem, identify the gap,
+%   and state the paper's high-level answer.
+%
+% - Section II should formalize the tradeoff and define the main
+%   optimization objects.
+%
+% - Section III-A and III-B should explain the communication mechanism
+%   in clear communications language.
+%
+% - Section III-C is the right place to make the MoE / routing /
+%   differentiable training story explicit.
+%
+% Do not move result interpretation into the method section,
+% and do not let training details take over the system description.
+%
+% ------------------------------------------------------------
+% 5. KEEP THE MAIN IDEA VISIBLE EARLY
+% ------------------------------------------------------------
+%
+% The key idea of each subsection should appear early,
+% ideally in the first paragraph or first two sentences.
+%
+% Do not hide the real point behind long setup text.
+%
+% If the subsection is about:
+%
+% - semantic quantization: say early that the latent must be converted
+%   into a finite payload and that adaptive fidelity is realized by
+%   progressive streams;
+%
+% - modulation adaptation: say early that, once the payload is fixed,
+%   modulation controls transport efficiency and robustness;
+%
+% - training: say early that the policy is discrete, so it is realized
+%   by routed modules and trained through relaxed routing and surrogate gradients.
+%
+% ------------------------------------------------------------
+% 6. USE ONLY LOAD-BEARING MATH IN THE MAIN TEXT
+% ------------------------------------------------------------
+%
+% Do not dump every implementation loss or every engineering stabilizer
+% into the main equations.
+%
+% In the main text, keep only the terms that carry the paper's logic.
+% Group small stabilizers into a support term or move them to
+% implementation details.
+%
+% A displayed equation should earn its space.
+%
+% If a term is not important enough to explain clearly,
+% it is probably not important enough to appear in the main equation.
+%
+% ------------------------------------------------------------
+% 7. EXPLAIN HARD EQUATIONS AFTERWARD, NOT BEFORE
+% ------------------------------------------------------------
+%
+% For any equation block that is central, potentially confusing,
+% or structurally important, add one short interpretation sentence after it.
+%
+% The purpose of this sentence is:
+%
+% - to state what the equation means in plain system language,
+% - to clarify why it matters,
+% - to prevent the reader from having to infer the role alone.
+%
+% Keep these interpretation sentences short and direct.
+%
+% ------------------------------------------------------------
+% 8. AVOID REDUNDANCY ACROSS SECTIONS
+% ------------------------------------------------------------
+%
+% Do not fully redefine in Section III what has already been formally
+% defined in Section II.
+%
+% Once a tradeoff, distortion, or cost is formally defined,
+% later sections should only refer back to it and explain how the
+% proposed design realizes or controls it.
+%
+% This keeps the paper compact and avoids the feeling that the same
+% idea is being re-explained multiple times.
+%
+% ------------------------------------------------------------
+% 9. KEEP THE LANGUAGE COMMUNICATIONS-ORIENTED
+% ------------------------------------------------------------
+%
+% Prefer system and communication language over ML-heavy language
+% unless the subsection is specifically about the training realization.
+%
+% In general:
+%
+% - A/B should sound like communication-system design;
+% - C can carry the MoE / routing / training language.
+%
+% Even when MoE is important, it should be framed as the realization
+% mechanism of the adaptive communication policy, not as a detached
+% ML novelty.
+%
+% ------------------------------------------------------------
+% 10. PRESERVE SMOOTHNESS
+% ------------------------------------------------------------
+%
+% The writing should feel smooth in the following sense:
+%
+% - each paragraph begins from what is already known,
+% - then introduces one new idea,
+% - then closes with why that idea matters.
+%
+% Avoid abrupt transitions such as:
+%
+% - introducing notation before the object is motivated,
+% - switching from system explanation to code-like detail,
+% - mentioning a training issue before the task is stated,
+% - discussing results inside the method section.
+%
+% A good test is:
+%
+%   could a careful communications reader follow the story
+%   without seeing the code?
+%
+% If not, the exposition is still too implementation-driven.
+%
+% ------------------------------------------------------------
+% 11. GENERAL BALANCE TO MAINTAIN
+% ------------------------------------------------------------
+%
+% The desired balance is:
+%
+% - rigorous but not overloaded,
+% - technical but readable,
+% - mathematically tight but not notation-heavy,
+% - ML-aware but communication-centered,
+% - compact but still interpretable.
+%
+% In short:
+%
+%   explain why first,
+%   then show how,
+%   then formalize it,
+%   then interpret it.
+%
+% That is the writing mode to preserve in the next prompt.

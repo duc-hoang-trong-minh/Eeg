@@ -1,0 +1,224 @@
+
+
+\documentclass[journal]{IEEEtran}
+
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{bm}
+\usepackage{graphicx}
+\usepackage{cite}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\begin{document}
+
+\title{Black-Box Channel-Sparse Adversarial Attacks on EEG Recognition}
+
+\author{Duc}
+
+\maketitle
+
+\begin{abstract}
+Electroencephalography (EEG) signals carry structured neural oscillations across multiple electrode channels. Machine learning models trained to classify these signals are vulnerable to adversarial manipulation, yet no principled black-box attack has been formulated that respects the spectrotemporal structure of EEG. We propose a channel-sparse adversarial attack formulated as a combined channel-$l_0$ and $l_\infty$ minimization problem, in the spirit of Croce and Hein. The $l_0$ term counts the number of attacked electrode channels; the $l_\infty$ bound controls the peak amplitude of the injected signal. Perturbations are parameterized through a waveform basis spanning the physiological frequency band, which enforces the spectral constraint by construction rather than by penalty. The problem is solved by greedy channel selection with simultaneous perturbation stochastic approximation (SPSA) refinement, using only score queries to the classifier. The resulting framework is interpretable, signal-consistent, and provides a principled threat model for studying the adversarial robustness of EEG-based recognition systems.
+\end{abstract}
+
+\begin{IEEEkeywords}
+EEG, adversarial attack, black-box, channel-sparse, $l_0$-attack, SPSA.
+\end{IEEEkeywords}
+
+% ============================================================
+\section{Introduction}
+% ============================================================
+
+EEG differs from images in one fundamental way: its meaningful structure is spectrotemporal rather than spatial. Each electrode records a superposition of neural oscillations at characteristic frequencies --- theta ($4$--$8$~Hz), alpha ($8$--$13$~Hz), and beta ($13$--$30$~Hz) --- sampled at a fixed rate to produce a discrete-time multichannel signal. Machine learning models trained on this signal, such as EEGConformer~\cite{song2022eegconformer}, learn to identify these oscillatory patterns and have demonstrated strong recognition performance in motor imagery, emotion, and authentication tasks.
+
+This spectrotemporal structure defines what an adversarial perturbation must look like to be effective. An arbitrary dense noise signal would appear as a wideband artifact and would be suppressed by standard EEG preprocessing. A meaningful adversarial perturbation must instead inject energy within the same frequency bands that the classifier relies upon, and must do so on a small number of channels to remain physically plausible and stealthy.
+
+Existing adversarial attacks on EEG~\cite{feng2021saga} have either assumed white-box gradient access or relied on dense, unconstrained perturbations that do not respect the signal structure. Neither assumption is realistic in deployed systems. We close this gap by proposing a black-box attack that is sparse over channels, bounded in peak amplitude, and restricted to the physiological frequency band by construction.
+
+The attack is formulated as a combined channel-$l_0$ and $l_\infty$ minimization problem following the framework of Croce and Hein~\cite{croce2019sparse}, adapted to the EEG setting. The channel-$l_0$ norm counts the number of attacked electrodes. The $l_\infty$ bound controls the amplitude of the injected waveform. A waveform basis over the EEG spectral band serves as the parameterization, simultaneously reducing the search space and enforcing the frequency constraint without any additional penalty term.
+
+% ============================================================
+\section{Channel-Sparse Attack Formulation}
+% ============================================================
+
+\subsection{Signal Model and Threat Model}
+
+An EEG trial is a multichannel discrete-time signal. Let $\mathbf{X} \in \mathbb{R}^{C \times T}$ denote such a trial with $C$ electrode channels and $T$ samples recorded at sampling rate $f_s$. Let $f : \mathbb{R}^{C \times T} \rightarrow \mathbb{R}^K$ be a $K$-class classifier and $y \in \{1,\dots,K\}$ the true label. We denote the predicted label $\hat{y}(\mathbf{X}) = \arg\max_k f_k(\mathbf{X})$.
+
+The attacker has score-only access to $f(\cdot)$ and seeks a perturbation $\mathbf{E} \in \mathbb{R}^{C \times T}$ that causes misclassification: $\hat{y}(\mathbf{X} + \mathbf{E}) \neq y$. We denote by $\mathbf{e}_c \in \mathbb{R}^T$ the $c$-th row of $\mathbf{E}$, i.e., the perturbation waveform on channel~$c$.
+
+\subsection{The Channel-$l_0$ and $l_\infty$ Attack}
+
+Because EEG has $C$ electrode channels, the natural unit of sparsity is the channel, not the individual sample. We define the channel-$l_0$ norm as the number of channels carrying a nonzero perturbation:
+\begin{equation}
+\gamma(\mathbf{E}) = \sum_{c=1}^{C} \mathbf{1}[\mathbf{e}_c \neq \mathbf{0}].
+\label{eq:l0}
+\end{equation}
+This is the EEG analogue of the pixel-$l_0$ norm of~\cite{croce2019sparse}: sparsity is measured over electrodes rather than individual coordinates.
+
+A sparse perturbation can still be conspicuous if its amplitude is large. Following~\cite{croce2019sparse}, we impose a simultaneous $l_\infty$ amplitude bound $\epsilon$ to keep the injected signal imperceivable. The attack problem is then:
+\begin{equation}
+\min_{\mathbf{E} \in \mathbb{R}^{C \times T}} \; \gamma(\mathbf{E})
+\quad \text{s.t.} \quad
+\hat{y}(\mathbf{X} + \mathbf{E}) \neq y, \quad
+\|\mathbf{E}\|_\infty \leq \epsilon.
+\label{eq:attack}
+\end{equation}
+The $l_0$ term determines \emph{which} channels are attacked; the $l_\infty$ constraint controls \emph{how strongly} any sample within those channels is perturbed.
+
+\subsection{Waveform Basis and the Combined Problem}
+
+A perturbation satisfying~\eqref{eq:attack} could in principle be any bounded matrix with few nonzero rows. However, an arbitrary waveform on a selected channel would contain high-frequency energy outside the EEG spectral band, making it both ineffective against frequency-aware classifiers and easily detected by preprocessing. The perturbation must therefore be restricted to the physiological band $[f_{\min}, f_{\max}]$.
+
+We impose this constraint structurally by parameterizing all perturbations through a fixed waveform basis. Let $\mathbf{\Phi} \in \mathbb{R}^{r \times T}$ be a matrix whose rows are Hanning-windowed sinusoids, uniformly spaced in frequency over $[f_{\min}, f_{\max}]$:
+\begin{equation}
+\Phi_{i}(t) = h(t)\cos\!\left(\frac{2\pi f_i\, t}{f_s} + \psi_i\right), \quad i = 1,\dots,r,
+\label{eq:basis}
+\end{equation}
+where $h(t)$ is a Hanning envelope and $f_i \in [f_{\min}, f_{\max}]$. The Hanning window tapers the waveform smoothly to zero at both endpoints, preventing edge discontinuities without any smoothness penalty.
+
+For a coefficient matrix $\mathbf{A} \in \mathbb{R}^{C \times r}$, the structured perturbation is:
+\begin{equation}
+\mathbf{E} = \mathbf{A}\mathbf{\Phi}.
+\label{eq:parameterization}
+\end{equation}
+Channel $c$ is attacked if and only if $\mathbf{a}_c \neq \mathbf{0}$, so $\gamma(\mathbf{A\Phi}) = \|\mathbf{A}\|_{2,0}$, where $\|\mathbf{A}\|_{2,0}$ counts the number of nonzero rows of $\mathbf{A}$. Substituting~\eqref{eq:parameterization} into~\eqref{eq:attack}, the attack problem in terms of coefficients is:
+\begin{equation}
+\min_{\mathbf{A} \in \mathbb{R}^{C \times r}} \; \|\mathbf{A}\|_{2,0}
+\quad \text{s.t.} \quad
+\hat{y}(\mathbf{X} + \mathbf{A\Phi}) \neq y, \quad
+\|\mathbf{A\Phi}\|_\infty \leq \epsilon.
+\label{eq:attack_A}
+\end{equation}
+The frequency constraint is now enforced by construction through the basis~\eqref{eq:basis}, and the search space is reduced from $C \times T$ free variables to $C \times r$ coefficients with $r \ll T$.
+
+% ============================================================
+\section{Attack Algorithm}
+% ============================================================
+
+For the algorithmic description, it is convenient to write the perturbation channel-wise as
+\begin{equation}
+\delta_c(t) = \sum_{i=1}^{r} a_{c,i}\,\Phi_i(t),
+\qquad
+\mathbf{E} = \sum_{c=1}^{C} \mathbf{e}_c \delta_c^{\top}.
+\label{eq:channel_waveform_form}
+\end{equation}
+
+\subsection{Greedy Channel Selection}
+
+Problem~\eqref{eq:attack_A} is combinatorial over the attacked channel set and the associated waveform coefficients. We solve it by greedy forward selection: starting from an empty support $\mathcal{S} = \varnothing$, we add one channel per iteration, always selecting the channel whose inclusion produces the greatest increase in an attack score. Let
+\begin{equation}
+\hat{y} = \arg\max_{r=1,\dots,K} f_r(\mathbf{X})
+\label{eq:clean_winner}
+\end{equation}
+denote the clean predicted class. We define the attack score
+\begin{equation}
+\Gamma(\mathbf{X}^{\mathrm{adv}}) = \max_{j \neq \hat{y}} f_j(\mathbf{X}^{\mathrm{adv}}) - f_{\hat{y}}(\mathbf{X}^{\mathrm{adv}}),
+\label{eq:attack_score}
+\end{equation}
+so that $\Gamma \geq 0$ is equivalent to changing the prediction away from the clean winner. The greedy selection rule is:
+\begin{equation}
+c^* = \arg\max_{c \notin \mathcal{S}} \; \Gamma\!\left(\mathbf{X} + \mathbf{E}^{\mathrm{probe}}_{\mathcal{S} \cup \{c\}}\right),
+\qquad
+\mathcal{S} \leftarrow \mathcal{S} \cup \{c^*\},
+\label{eq:greedy}
+\end{equation}
+where $\mathbf{E}^{\mathrm{probe}}_{\mathcal{S} \cup \{c\}}$ is a fast trial perturbation supported on the current channel set plus candidate channel $c$.
+
+Evaluating~\eqref{eq:greedy} exactly for each candidate would require a full coefficient optimization per channel, which is prohibitively expensive under a query budget. We instead approximate the inner maximization by a fast waveform probe: for each candidate channel $c$, we evaluate $\Gamma$ at a small number of random $\pm$direction coefficient vectors and retain the best response. This provides a cheap, query-efficient ranking of candidates before committing to the full SPSA refinement.
+
+\subsection{SPSA Coefficient Refinement}
+
+After each greedy step, the active channel coefficients $\{\mathbf{a}_c\}_{c \in \mathcal{S}}$ are jointly refined. Since $f$ is a black-box, gradients are unavailable, and we use simultaneous perturbation stochastic approximation (SPSA)~\cite{spall1992spsa}, which estimates the gradient from exactly two function evaluations per step.
+
+Let $\boldsymbol{\alpha} = \mathrm{vec}\!\left([\mathbf{a}_c]_{c \in \mathcal{S}}\right) \in \mathbb{R}^{|\mathcal{S}|r}$ collect all active coefficients and define
+\begin{equation}
+J(\boldsymbol{\alpha}) = -\Gamma\!\left(\mathbf{X} + \sum_{c \in \mathcal{S}} \mathbf{e}_c \delta_c(\boldsymbol{\alpha})^{\top}\right).
+\label{eq:spsa_objective}
+\end{equation}
+At iteration $n$, SPSA draws $\boldsymbol{\Delta}_n \in \{-1,+1\}^{|\mathcal{S}|r}$ uniformly at random, evaluates $J$ at two symmetric perturbation points, and forms the gradient estimate:
+\begin{equation}
+\widehat{\mathbf{g}}_n = \frac{J(\boldsymbol{\alpha}_n + c_n\boldsymbol{\Delta}_n) - J(\boldsymbol{\alpha}_n - c_n\boldsymbol{\Delta}_n)}{2c_n} \boldsymbol{\Delta}_n.
+\label{eq:spsa_grad}
+\end{equation}
+The coefficient update with projection onto the $l_\infty$ feasible set is:
+\begin{equation}
+\boldsymbol{\alpha}_{n+1} = \Pi_\epsilon\!\left(\boldsymbol{\alpha}_n - a_n \widehat{\mathbf{g}}_n\right),
+\label{eq:spsa_update}
+\end{equation}
+where $\Pi_\epsilon$ denotes projection of the synthesized perturbation $\sum_{c \in \mathcal{S}} \mathbf{e}_c \delta_c^{\top}$ onto $\|\cdot\|_\infty \leq \epsilon$, and the decaying schedules $a_n = a/\sqrt{n}$, $c_n = c/n^{0.101}$ follow standard SPSA convergence conditions. The best $\boldsymbol{\alpha}$ found across all iterations and independent random restarts is retained.
+
+The full procedure is summarized in Algorithm~\ref{alg:channel_sparse_attack}.
+
+\begin{algorithm}[t]
+\caption{Channel-Sparse Black-Box Attack}
+\label{alg:channel_sparse_attack}
+\begin{algorithmic}[1]
+\REQUIRE EEG trial $\mathbf{X} \in \mathbb{R}^{C \times T}$, label $y$, scorer $f(\cdot)$, basis atoms $\{\phi_i\}_{i=1}^{r}$, channel budget $B$, amplitude bound $\epsilon$
+\ENSURE Adversarial example $\mathbf{X}^{\mathrm{adv}}$
+
+\STATE $\hat{y} \leftarrow \arg\max_{r=1,\dots,K} f_r(\mathbf{X})$
+\STATE $\mathcal{S} \leftarrow \varnothing$; initialize $\mathbf{a}_c \leftarrow \mathbf{0} \in \mathbb{R}^{r}$ for all $c$
+\IF{$\hat{y} \neq y$}
+    \STATE \textbf{return} $\mathbf{X}$ \hfill \COMMENT{already misclassified}
+\ENDIF
+\FOR{$i = 1$ \TO $B$}
+    \FOR{each $c \notin \mathcal{S}$}
+        \STATE Build $\mathbf{E}^{\mathrm{probe}}_{\mathcal{S}\cup\{c\}}$ from a few random $\pm$ waveform directions
+        \STATE Score candidate $c$ with $\Gamma(\mathbf{X} + \mathbf{E}^{\mathrm{probe}}_{\mathcal{S}\cup\{c\}})$
+    \ENDFOR
+    \STATE $c^* \leftarrow \arg\max_{c \notin \mathcal{S}}$ probe score \hfill \COMMENT{Eq.~\eqref{eq:greedy}}
+    \STATE $\mathcal{S} \leftarrow \mathcal{S} \cup \{c^*\}$
+    \STATE Refine $\{\mathbf{a}_c\}_{c \in \mathcal{S}}$ by SPSA minimizing $J(\boldsymbol{\alpha})$ \hfill \COMMENT{Eqs.~\eqref{eq:spsa_objective}--\eqref{eq:spsa_update}}
+    \IF{$\Gamma\!\left(\mathbf{X} + \sum_{c \in \mathcal{S}} \mathbf{e}_c \delta_c^{\top}\right) \geq 0$}
+        \STATE \textbf{break} \hfill \COMMENT{attack succeeded}
+    \ENDIF
+\ENDFOR
+\STATE \textbf{return} $\mathbf{X}^{\mathrm{adv}} = \mathbf{X} + \sum_{c \in \mathcal{S}} \mathbf{e}_c \delta_c^{\top}$
+\end{algorithmic}
+\end{algorithm}
+
+% ============================================================
+\section{Discussion}
+% ============================================================
+
+The formulation in~\eqref{eq:attack_A} is the EEG analogue of the $l_0 + l_\infty$ attack of Croce and Hein~\cite{croce2019sparse}, with two domain-specific adaptations.
+
+First, the sparsity unit is the electrode channel rather than the individual sample. A single perturbed sample has no physiological interpretation in EEG; the meaningful unit of spatial localization is a full channel trace. Channel-level $l_0$ sparsity is therefore the correct threat model for EEG, not sample-level sparsity.
+
+Second, the $l_\infty$ constraint in~\eqref{eq:attack_A} is enforced on the synthesized waveform $\mathbf{A\Phi}$ rather than on the raw coefficient vector. This means the amplitude budget $\epsilon$ is expressed directly in signal units, and is independent of the normalization of $\mathbf{\Phi}$. A perturbation within this budget appears as a weak neural oscillation superimposed on the true signal, which is the correct threat model for an imperceivable EEG attack.
+
+The waveform basis~\eqref{eq:basis} makes the spectral constraint structural rather than penalized. A penalty weight requires manual tuning and may be violated during optimization; a basis restriction is inviolable by construction. Every perturbation produced by this attack lies within the theta--beta band, so it looks like a plausible neural oscillation rather than a wideband artifact. This also means the attack is more dangerous in practice: its perturbations are the hardest to detect or filter without also disrupting the legitimate signal.
+
+% ============================================================
+\section{Conclusion}
+% ============================================================
+
+We presented a channel-sparse black-box adversarial attack on EEG recognition, formulated as a combined channel-$l_0$ and $l_\infty$ minimization problem. Perturbations are parameterized through a waveform basis that enforces the physiological frequency constraint by construction. Greedy forward selection with SPSA refinement solves the resulting mixed discrete--continuous problem under score-only access to the classifier. The attack is interpretable, signal-consistent, and provides a principled basis for studying adversarial robustness in EEG-based recognition and authentication systems.
+
+\bibliographystyle{IEEEtran}
+\begin{thebibliography}{1}
+
+\bibitem{song2022eegconformer}
+Y.~Song, Q.~Zheng, B.~Liu, and X.~Gao,
+``EEG Conformer: Convolutional Transformer for EEG Decoding and Visualization,''
+\emph{IEEE Trans. Neural Syst. Rehabil. Eng.}, 2022.
+
+\bibitem{feng2021saga}
+B.~Feng, Y.~Wang, and Y.~Ding,
+``SAGA: Sparse Adversarial Attack on EEG-Based Brain Computer Interface,''
+in \emph{Proc. IEEE ICASSP}, 2021.
+
+\bibitem{spall1992spsa}
+J.~C. Spall,
+``Multivariate Stochastic Approximation Using a Simultaneous Perturbation Gradient Approximation,''
+\emph{IEEE Trans. Autom. Control}, vol.~37, no.~3, pp.~332--341, 1992.
+
+\bibitem{croce2019sparse}
+F.~Croce and M.~Hein,
+``Sparse and Imperceivable Adversarial Attacks,''
+in \emph{Proc. IEEE/CVF ICCV}, 2019.
+
+\end{thebibliography}
+
+\end{document}

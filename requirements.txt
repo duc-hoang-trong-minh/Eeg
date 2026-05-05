@@ -4,6 +4,7 @@ torch>=2.1
 braindecode>=0.8
 moabb>=1.2,<1.5
 mne>=1.5
+mne-bids>=0.17
 pandas>=2.0
 matplotlib>=3.7
 tqdm>=4.66

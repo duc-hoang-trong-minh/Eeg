@@ -6,7 +6,15 @@ from pathlib import Path
 class BaselineConfig:
     model_name: str = "EEGConformer"
     dataset_name: str = "BNCI2014_001"
-    subject_ids: tuple[int, ...] = (1, 2, 3)
+    subject_ids: tuple[int | str, ...] | None = (1, 2, 3)
+    dataset_path: str | None = None
+    max_subjects: int | None = None
+    min_sessions_per_subject: int = 1
+    common_eeg_channels: tuple[str, ...] | None = None
+    hbn_qc_policy: str = "available_only"
+    hbn_train_tasks: tuple[str, ...] | None = None
+    hbn_valid_tasks: tuple[str, ...] | None = None
+    hbn_min_eeg_channels: int = 64
     target_mode: str = "task"
     stability_seeds: tuple[int, ...] = (7, 11, 19)
     evaluation_protocol: str = "within_session"
@@ -27,6 +35,7 @@ class BaselineConfig:
     window_size_seconds: float = 4.0
     window_stride_seconds: float = 4.0
     trialwise_decoding: bool = True
+    window_preload: bool = True
 
     use_data_augmentation: bool = True
 

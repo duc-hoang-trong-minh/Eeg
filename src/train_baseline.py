@@ -16,7 +16,7 @@ from skorch.callbacks import EarlyStopping, EpochScoring, LRScheduler
 from skorch.helper import predefined_split
 
 from .config import BaselineConfig, OutputConfig
-from .data import load_moabb_windows
+from .data import load_windows
 from .plot_training import generate_training_plots
 
 
@@ -171,7 +171,7 @@ def train_and_save_baseline(
         use_seed_suffix=use_seed_suffix,
     )
 
-    bundle = load_moabb_windows(cfg)
+    bundle = load_windows(cfg)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = _build_model(
         cfg=cfg,

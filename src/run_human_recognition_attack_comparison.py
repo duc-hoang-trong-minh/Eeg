@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import os
 from collections import defaultdict, deque
+from dataclasses import fields
 
 import numpy as np
 
 if __package__:
-    from .data import load_moabb_windows
+    from .config import BaselineConfig
+    from .data import load_windows
     from .human_recognition_config import (
         build_bnci2014_001_human_recognition_config,
         build_bnci2014_001_human_recognition_output_config,
@@ -29,7 +31,8 @@ else:
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
 
-    from src.data import load_moabb_windows
+    from src.config import BaselineConfig
+    from src.data import load_windows
     from src.human_recognition_config import (
         build_bnci2014_001_human_recognition_config,
         build_bnci2014_001_human_recognition_output_config,
@@ -47,6 +50,35 @@ else:
 
 def _build_variants() -> list[dict]:
     shortlist_size = int(os.environ.get("EEG_ATTACK_CHANNEL_SHORTLIST_SIZE", "11"))
+    config_updates = {}
+
+    int_env_overrides = {
+        "EEG_ATTACK_SUPPORT_BUDGET_K": "support_budget_k",
+        "EEG_ATTACK_MAX_OUTER_ITERS": "max_outer_iters",
+        "EEG_ATTACK_MAX_QUERY_BUDGET": "max_query_budget",
+        "EEG_ATTACK_CANDIDATE_PROBE_RESTARTS": "candidate_probe_restarts",
+        "EEG_ATTACK_SPSA_STEPS": "spsa_steps",
+        "EEG_ATTACK_SPSA_RESTARTS": "spsa_restarts",
+    }
+    for env_name, field_name in int_env_overrides.items():
+        env_value = os.environ.get(env_name)
+        if env_value is not None:
+            config_updates[field_name] = int(env_value)
+    if "support_budget_k" in config_updates and "max_outer_iters" not in config_updates:
+        config_updates["max_outer_iters"] = int(config_updates["support_budget_k"])
+
+    float_env_overrides = {
+        "EEG_ATTACK_MAX_PEAK_RATIO": "max_perturbation_peak_ratio",
+        "EEG_ATTACK_MAX_COEFF_ABS": "max_coeff_abs",
+        "EEG_ATTACK_L2_WEIGHT": "l2_weight",
+        "EEG_ATTACK_TV_WEIGHT": "tv_weight",
+        "EEG_ATTACK_BAND_WEIGHT": "band_weight",
+    }
+    for env_name, field_name in float_env_overrides.items():
+        env_value = os.environ.get(env_name)
+        if env_value is not None:
+            config_updates[field_name] = float(env_value)
+
     return [
         {
             "name": "human_sparse_channel_hybrid",
@@ -56,6 +88,7 @@ def _build_variants() -> list[dict]:
                 support_mode="channel_first",
                 basis_mode="hybrid",
                 basis_phase_count=2,
+                **config_updates,
             ),
         },
         {
@@ -67,6 +100,7 @@ def _build_variants() -> list[dict]:
                 basis_mode="hybrid",
                 basis_phase_count=2,
                 channel_shortlist_size=shortlist_size,
+                **config_updates,
             ),
         },
     ]
@@ -110,17 +144,33 @@ def _balanced_sample_candidates(
     return selected
 
 
-def run_human_recognition_attack_comparison() -> dict:
-    baseline_cfg = build_bnci2014_001_human_recognition_config()
-    out_cfg = build_bnci2014_001_human_recognition_output_config()
+def _baseline_config_from_checkpoint(checkpoint: dict) -> BaselineConfig | None:
+    cfg_payload = checkpoint.get("config")
+    if not isinstance(cfg_payload, dict):
+        return None
+
+    allowed_fields = {field.name for field in fields(BaselineConfig)}
+    cfg_kwargs = {key: value for key, value in cfg_payload.items() if key in allowed_fields}
+    return BaselineConfig(**cfg_kwargs)
+
+
+def run_human_recognition_attack_comparison(baseline_cfg=None, out_cfg=None) -> dict:
+    if baseline_cfg is None:
+        baseline_cfg = build_bnci2014_001_human_recognition_config()
+    if out_cfg is None:
+        out_cfg = build_bnci2014_001_human_recognition_output_config()
     out_cfg.root.mkdir(parents=True, exist_ok=True)
 
     requested_device = os.environ.get("EEG_ATTACK_DEVICE")
     max_samples = int(os.environ.get("EEG_ATTACK_MAX_SAMPLES", "128"))
 
-    model, device, _ = load_eegnet_checkpoint(str(out_cfg.baseline_model_path), device=requested_device)
+    model, device, checkpoint = load_eegnet_checkpoint(str(out_cfg.baseline_model_path), device=requested_device)
+    checkpoint_cfg = _baseline_config_from_checkpoint(checkpoint)
+    use_checkpoint_config = os.environ.get("EEG_ATTACK_USE_CHECKPOINT_CONFIG", "1") != "0"
+    if use_checkpoint_config and checkpoint_cfg is not None:
+        baseline_cfg = checkpoint_cfg
     score_fn = make_score_fn(model, device)
-    bundle = load_moabb_windows(baseline_cfg)
+    bundle = load_windows(baseline_cfg)
 
     candidate_payloads: list[tuple[int, np.ndarray, int]] = []
     for idx in range(len(bundle.valid_set)):
@@ -181,6 +231,8 @@ def run_human_recognition_attack_comparison() -> dict:
         "model_name": baseline_cfg.model_name,
         "target_mode": baseline_cfg.target_mode,
         "evaluation_protocol": baseline_cfg.evaluation_protocol,
+        "used_checkpoint_config": bool(use_checkpoint_config and checkpoint_cfg is not None),
+        "checkpoint_split_summary": checkpoint.get("split_summary", {}),
         "score_device": str(device),
         "worker_device": worker_device,
         "n_workers": n_workers,
