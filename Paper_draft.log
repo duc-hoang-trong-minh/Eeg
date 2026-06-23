@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2023.3.27)  15 APR 2026 13:08
+This is pdfTeX, Version 3.141592653-2.6-1.40.25 (TeX Live 2023) (preloaded format=pdflatex 2023.3.27)  23 JUN 2026 10:32
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -320,51 +320,102 @@ sr/local/texlive/2023/texmf-dist/fonts/enc/dvips/base/8r.enc}
 
 
 ]
-LaTeX Font Info:    Trying to load font information for OMS+ptm on input line 1
-63.
+Underfull \hbox (badness 10000) in paragraph at lines 98--98
+[]\OT1/ptm/m/n/7 Filter/signal-processing
+ []
 
-(/usr/local/texlive/2023/texmf-dist/tex/latex/psnfss/omsptm.fd
-File: omsptm.fd 
-)
-LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 163.
- [2] [3
 
-]
+Underfull \hbox (badness 2884) in paragraph at lines 99--99
+[]\OT1/ptm/m/n/7 Time-frequency wavelet per-tur-ba-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 99--100
+[]\OT1/ptm/m/n/7 Brainprint-relevant, but not
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 99--100
+\OT1/ptm/m/n/7 score-only sparse-electrode
+ []
+
+
+Underfull \hbox (badness 4416) in paragraph at lines 100--100
+[]\OT1/ptm/m/n/7 High-frequency per-tur-ba-tion with
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 101--101
+[]\OT1/ptm/m/n/7 Complete elec-trode traces with
+ []
+
+[2] [3]
+<Figure/oscillatory_atom_taper_example.pdf, id=31, 505.45462pt x 279.01012pt>
+File: Figure/oscillatory_atom_taper_example.pdf Graphic file (type pdf)
+<use Figure/oscillatory_atom_taper_example.pdf>
+Package pdftex.def Info: Figure/oscillatory_atom_taper_example.pdf  used on inp
+ut line 207.
+(pdftex.def)             Requested size: 252.0pt x 139.10027pt.
+ [4 <./Figure/oscillatory_atom_taper_example.pdf>] [5] [6]
+<Figure/hbn_scaling_dashboard.pdf, id=93, 781.72pt x 225.24101pt>
+File: Figure/hbn_scaling_dashboard.pdf Graphic file (type pdf)
+<use Figure/hbn_scaling_dashboard.pdf>
+Package pdftex.def Info: Figure/hbn_scaling_dashboard.pdf  used on input line 3
+93.
+(pdftex.def)             Requested size: 505.6778pt x 145.70721pt.
+<Figure/hbn_prefix_success_curves.pdf, id=94, 485.34216pt x 254.14902pt>
+File: Figure/hbn_prefix_success_curves.pdf Graphic file (type pdf)
+<use Figure/hbn_prefix_success_curves.pdf>
+Package pdftex.def Info: Figure/hbn_prefix_success_curves.pdf  used on input li
+ne 408.
+(pdftex.def)             Requested size: 423.12378pt x 221.58096pt.
+<Figure/hbn_first_success_heatmap.pdf, id=95, 520.444pt x 254.14902pt>
+File: Figure/hbn_first_success_heatmap.pdf Graphic file (type pdf)
+<use Figure/hbn_first_success_heatmap.pdf>
+Package pdftex.def Info: Figure/hbn_first_success_heatmap.pdf  used on input li
+ne 419.
+(pdftex.def)             Requested size: 423.12378pt x 206.62354pt.
+ [7]
+(./Paper_draft.bbl [8 <./Figure/hbn_scaling_dashboard.pdf>]) [9 <./Figure/hbn_p
+refix_success_curves.pdf> <./Figure/hbn_first_success_heatmap.pdf>]
 (./Paper_draft.aux) ) 
 Here is how much of TeX's memory you used:
- 3974 strings out of 476025
- 63562 string characters out of 5790023
+ 4037 strings out of 476025
+ 65274 string characters out of 5790023
  1876388 words of memory out of 5000000
- 24376 multiletter control sequences out of 15000+600000
- 554379 words of font info for 118 fonts, out of 8000000 for 9000
+ 24426 multiletter control sequences out of 15000+600000
+ 558570 words of font info for 129 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 57i,11n,62p,1223b,478s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 57i,13n,62p,1763b,480s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/local/texlive/2023/texmf-dist/fonts/type1/public/ams
 fonts/cm/cmbx10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsf
 onts/cm/cmbx7.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfon
 ts/cm/cmex10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfont
-s/cm/cmmi10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts
-/cm/cmmi5.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/c
-m/cmmi7.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/
-cmmi9.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cm
-mib10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cm
-r10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6
-.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pf
-b></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb
-></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb><
-/usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></u
-sr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr
-/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb><
-/usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm7.pf
-b></usr/local/texlive/2023/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/lo
-cal/texlive/2023/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texli
-ve/2023/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2023/te
-xmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on Paper_draft.pdf (3 pages, 228823 bytes).
+s/cmextra/cmex7.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsf
+onts/cm/cmmi10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfo
+nts/cm/cmmi5.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfont
+s/cm/cmmi6.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/
+cm/cmmi7.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm
+/cmmi8.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/c
+mmi9.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr
+10.pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.
+pfb></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb
+></usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></
+usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr
+/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/
+local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/lo
+cal/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/loca
+l/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/
+local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></
+usr/local/texlive/2023/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm7.pfb
+></usr/local/texlive/2023/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/loc
+al/texlive/2023/texmf-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/local/texliv
+e/2023/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/local/texlive/2023/tex
+mf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on Paper_draft.pdf (9 pages, 394298 bytes).
 PDF statistics:
- 120 PDF objects out of 1000 (max. 8388607)
- 72 compressed objects within 1 object stream
+ 370 PDF objects out of 1000 (max. 8388607)
+ 120 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
- 1 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 21 words of extra memory for PDF output out of 10000 (max. 10000000)
 

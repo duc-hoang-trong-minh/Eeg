@@ -1,0 +1,499 @@
+\documentclass[journal]{IEEEtran}
+% \IEEEoverridecommandlockouts
+% The preceding line only needs to identify funding in the first footnote. If that is unneeded, please comment it out.
+% \usepackage[left=1.62cm,right=0.7in,top=0.75in , bottom = 1.07in]{geometry}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+% \usepackage[T1]{fontenc}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{multirow}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{textcomp}
+\usepackage{xcolor}
+% \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+%     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\begin{document}
+\title{Backdoor Attacks on Semantic Communications Systems with  Joint Source and Channel Coding \\
+\thanks{}
+}
+
+\author{Duc Trong Minh Hoang and Long Bao Le,~\IEEEmembership{Fellow,~IEEE}
+        % <-this % stops a space
+\thanks{Received 25 August 2025; revised 17 November 2025; accepted 23 November 2025. Date
+ of publication xx xx 2025; date of current version xx, xxxx, 2025. The associate editor coordinating the review of this letter and approving it
+ for publication was Z. Yang. (Corresponding author: Long Bao Le.)
+ D. T. M. Hoang and L. B. Le are with INRS, University of Qu\'{e}bec, Montr\'{e}al, QC H5A 1K6, Canada (email:  
+trong-minh-duc.hoang@inrs.ca, long.le@inrs.ca).}% <-this % stops a space
+%\thanks{Manuscript received April 19, 2021; revised August 16, 2021.}
+}
+% \markboth{Journal of \LaTeX\ Class Files,~Vol.~14, No.~8, August~2021}%
+% {Shell \MakeLowercase{\textit{et al.}}: A Sample Article Using IEEEtran.cls for IEEE Journals}
+\maketitle
+\begin{abstract}
+
+%Deep learning–based semantic communication (SC) systems can efficiently extract task-relevant information and dramatically reduce transmission load via joint source and channel coding (JSCC). However, their reliance on neural networks introduces new security vulnerabilities. To our knowledge, 
+
+This paper studies the backdoor attack on the task-oriented digital semantic communication system.
+%with JSCC involving compression, quantization, and discrete modulation. 
+We propose TrojanDSC, a two-stage backdoor learning strategy. Specifically, in the first stage we focus the attack on the critical latent dimensions using an optimized latent trigger, and in the second stage we fine-tune the semantic encoder and classification layer. We evaluate TrojanDSC across a range of channel conditions, trigger types, and the fine-tuning defense, showing that it achieves an attack success rate (ASR) over 94\% for the poison rates of 10\% or more with negligible accuracy degradation on clean inputs and remains effective even after the fine-tuning defense. 
+
+
+%Specifically, we focus the attack on the critical latent dimensions using an optimized latent trigger in the first stage, and then fine-tune the semantic encoder and classification layer in the second stage. 
+
+
+
+%These findings underscore the urgent need for backdoor-aware defense mechanisms in DSC systems.
+
+
+% In particular, we propose TrojanDSC, a two-stage latent-space backdoor attack that injects a finely masked, channel-resilient shift into the most robust and decision-critical latent dimensions, enabling the backdoor to survive quantization and noise while preserving the task performance on clean inputs. 
+
+
+% Deep learning–based semantic communication (SC) enables efficient extraction of task-relevant information and dramatically reduces transmission load. However, its reliance on neural networks introduces new vulnerabilities. In this work, we present the first systematic study of backdoor attacks on digitally-modulated, hyperprior-based DeepJSCC systems for text classification. Unlike prior work that targets analog SC or simplified models, we focus on modern, quantized digital architectures that integrate variational compression and joint source–channel coding. We propose two backdoor strategies: (i) a brute-force poisoning method that exploits overfitting, and (ii) a stealthy two-stage alignment method that injects perturbations into the quantized latent space. We evaluate both attacks under varying channel conditions, compare trigger types, and quantify attack success under fine-tuned defense. Despite aggressive quantization and compression, our results show that targeted backdoors remain effective, surviving transmission and even post-hoc fine-tuning. These findings underscore the need for robust, backdoor-aware defenses in future SC systems.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Semantic communications, backdoor attacks, pretrained language models, security
+\end{IEEEkeywords}
+
+\section{Introduction} 
+
+% With the rapid evolution of mobile networks, the explosive growth of data has strained conventional communication systems, calling for bandwidth-efficient alternatives. Semantic communication (SC) addresses this challenge by focusing on transmitting meaning rather than raw data \cite{newsurvey}. In particular, an SC transmitter can leverage pretrained language models, such as RoBERTa \cite{Roberta}, to extract task-relevant semantic information, transmit it to the receiver, and thereby significantly reduce the bandwidth while preserving task performance.
+
+
+% Compression part maybe delete the survey part
+{
+With the rapid evolution of mobile networks, the explosive growth of data has strained conventional communication systems, calling for bandwidth-efficient alternatives. 
+Semantic communication (SC) addresses this challenge by transmitting meaning rather than raw bits. It does so by using encoders (e.g., RoBERTa \cite{Roberta}) to extract task-relevant semantics, compress them \cite{compress1,compress2,compress3,compress4}, and send significantly fewer bits while preserving task performance.}
+%\textcolor{blue}{With the rapid evolution of mobile networks, the explosive growth of data has strained conventional communication systems, calling for bandwidth-efficient alternatives. Semantic communication (SC) addresses this challenge by sending meaning, not raw bits, by  extracting task-relevant semantics with encoders, such as RoBERTa \cite{Roberta}, compressing \cite{compress1,compress2,compress3,compress4}, and transmitting far fewer bits while preserving task performance.}
+% Semantic communication (SC) addresses this challenge by focusing on transmitting meaning rather than raw data. In particular, an SC transmitter can leverage pretrained language models, such as RoBERTa \cite{Roberta}, to extract only task-relevant semantic information, further compress \cite{compress1, compress2, compress3, compress4} and transmit it to the receiver, and thereby significantly reduce the bandwidth while preserving task performance.}
+Joint source–channel coding (JSCC) complements SC by integrating data compression and error protection into the system. While classical JSCC typically uses hand-crafted mappings for finite-blocklength 
+channels, 
+% \cite{oldjscc2}
+ deep learning–based analog JSCC systems can outperform separate coding systems by mapping embeddings directly to waveforms \cite{analog_jscc_text}. However, analog SC systems are incompatible with modern digital infrastructure, motivating the development of digital SC (DSC) architectures. These digital systems typically quantize semantic features into discrete bitstreams and modulate them digitally, while retaining trainability. In particular, hyperprior-based variational autoencoders \cite{d2jscc_hyperprior_vae} provide precise rate control by learning entropy models over latent features, enabling aggressive data compression.
+
+Because DSC systems with JSCC are implemented using neural networks, they are vulnerable to adversarial manipulation. 
+In backdoored neural networks, hidden triggers embedded in input data can 
+induce
+incorrect predictions, while clean inputs are processed correctly.
+These backdoor attacks have been extensively studied in the machine learning community. However, recent research has shown that compression operations like quantization can disrupt backdoor signals, motivating the development of compression-aware backdoor attack design \cite{DuanAAAIJPEG,twostageattackcompress}. These research studies
+primarily focus on image codecs and overlook the added complexity of
+ the DSC systems, which involve unique processes and features such as entropy coding, quantization, modulation, and over-the-air distortion.
+\textcolor{black}{These transformations are integral to SC design, yet together they impose a highly non-linear and stochastic signal path that reshapes internal representations in unpredictable ways. As a result, conventional backdoor attacks are often rendered ineffective.}
+The SC community has only recently begun studying the backdoor threats. The work \cite{Sagduyu2023} investigated the backdoor attack on analog SC systems, while other works focused on image reconstruction or symbolic codecs  \cite{Zhou2024a, Zhou2024b, Xu_good_backdoor_2024, invisible}. Specifically, BASS \cite{Zhou2024a} and its stealthy successor \cite{Zhou2024b} operate on continuous semantic symbols over AWGN, omitting probabilistic quantization and entropy coding; therefore, their conclusions do not directly apply to a fully digital JSCC system. {Moreover, CSBA \cite{Xu_good_backdoor_2024} and InviINS \cite{invisible} target vision models by designing invisible triggers, remaining largely vision-centric. However, these works do not account for the quantization and entropy encoding processes that characterize modern DSC systems with JSCC. In practice, the transformations introduced by these JSCC components can significantly distort inputs, raising the question of whether backdoor signals can remain effective under such conditions.}
+
+%Separately, CSBA and InviINS \cite{Xu_good_backdoor_2024, invisible} attack the vision model by designing invisible triggers, remaining vision-centric. 
+%However, these works also do not account for the quantization and entropy encoding that define a modern DSC system with JSCC. In fact, the transformations within these JSCC building blocks can severely distort inputs, raising the question of whether backdoor signals remain effective.}
+
+
+
+In this paper, we present the first study of backdoor attacks on DSC systems with JSCC. We observe that conventional poisoning-based backdoor attacks with low poison rates often fail, owing to the complex and potentially non-linear effects of quantization, compression, and wireless channel distortion. To overcome these challenges, we develop TrojanDSC, a novel two-stage latent-space backdoor attack strategy. Specifically, TrojanDSC leverages a sparse, masked latent trigger on the semantic feature representation, along with a text trigger for backdoor injection in the first stage. 
+Then, in the second stage, the semantic encoder and classification head are fine-tuned, without relying on the latent trigger.
+%This vector is designed to be resilient against variational compression and noisy digital modulation while remaining stealthy and effective. 
+Our experiments demonstrate that TrojanDSC achieves an attack success rate exceeding 94\%  with negligible degradation in clean-input classification accuracy on the sentiment classification task. 
+Furthermore, our results show that TrojanDSC remains resilient against the fine-tuning defenses, underscoring a persistent security threat to practical DSC systems.
+
+
+% In this paper, we provide a systematic study of backdoor attacks on digitally-modulated SC systems with JSCC. Specifically, we first evaluate conventional data poisoning-based backdoor attacks and show that the naive backdoor implantation fails under quantization and noise. We then propose two tailored strategies. The first is the brute-force joint-poisoning baseline while the second is the stealthy two-stage alignment attack that injects a masked perturbation into the quantized latent space. Our experiments demonstrate that even under severe compression and wireless distortion, the latent-space backdoor attack strategy achieves over 94\% success with negligible loss in clean accuracy and remains robust against the fine-tuning defense. 
+%Although our approach draws inspiration from compression-aware attacks in vision, adapting them to DSC is fundamentally non-trivial. 
+%i deleted this and add it in the previous paragpah
+% Note that unlike frequency-based image attacks that operate in structured spectral domains, our method targets task-specific representations that undergo a sequence of learned variational compression, discrete quantization, entropy coding, digital modulation, and stochastic channel fading. Such transformations introduce severe non-differentiability, amplify noise, and impose tight constraints on where and how information can persist. As a result, backdoor attack strategies designed for vision codecs do not transfer to DSC. Our work bridges this gap with backdoor strategies tailored to the unique architecture of DSC.
+
+The remainder of this paper is organized as follows. Section II presents the system model. Section III describes the proposed backdoor attack. Section IV reports the experimental results. Section V concludes the paper.
+
+\section{System Model}
+\subsection{Semantic Communication Model}
+We consider a modern DSC system with JSCC for a classification task, as illustrated in Fig.~\ref{fig:system_model}. The transmitter comprises a transformer-based semantic encoder, a lossy compressor, a trainable channel encoder, and a differentiable modulation module. The receiver architecture includes a demodulator, a joint source-channel decoder, and a classification head.
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=\linewidth]{Fig/SemanticModel.pdf}
+    % \vspace{-0.2cm}
+    \caption{Task-oriented SC system with JSCC.}
+    \label{fig:system_model}
+\end{figure}
+Let \(\mathcal{D} = \{(\mathbf{d}^{(i)},c^{(i)})\}_{i=1}^N\) denote the processed dataset containing $N$ data samples obtained from applying the tokenization and embedding to the original dataset. 
+Each sample $i$ consists of a $L$-dimension token embedding $\mathbf{d}^{(i)} $  and its corresponding ground-truth label.  
+ The semantic encoder
+\(
+f_{\mathrm{enc}}(\cdot;\alpha)
+\)\footnote{Each learnable module is denoted by \(f_a(\cdot;\theta)\), where subscript \(a\) indicates the block role and \(\theta\) the trainable parameters.}
+then produce a latent presentation for each input sample:
+\begin{equation}
+\mathbf{y} = f_{\mathrm{enc}}(\mathbf{d}; \alpha) \in \mathbb{R}^{D},
+\end{equation}
+where \(D\) denotes the number of dimensions in the latent feature space and $\mathbf{d}$ denotes a generic data sample. The latent representation \(\mathbf{y}\) is then compressed by a joint source–channel encoder \(f_{\mathrm{JSCC}}(\cdot;\psi)\) to reduce the transmission load.
+This block performs feature compression, quantization, and bitstream generation, producing the following:
+\begin{equation}
+\mathbf{b}_{\text{mod}} = f_{\mathrm{JSCC}}(\mathbf{y}; \psi) \in \mathbb{R}^{M . b},
+\end{equation}
+where \(b\) denotes the number of bits per modulation symbol and \(M\) represents the number of symbols per input sample. The bitstreams are then soft-mapped using Gumbel-Softmax, enabling differentiable selection across modulation constellations. The resulting baseband signal is
+\begin{equation}
+\mathbf{x} = f_{\mathrm{Mod}}(\mathbf{b}_{\text{mod}}; \chi) \in \mathbb{C}^{M},
+\end{equation}
+with power constrained to be 1.
+%\(\frac{1}{BM} \, \mathbb{E}[\|\mathbf{X}\|_F^2] = 1\) where $||\cdot||_F$ denote the Forbenius norm. 
+The modulated signals are assumed to be transmitted over an additive white Gaussian noise (AWGN) channel, potentially subject to wireless fading. The received signal is given by
+\begin{equation}
+%\hat{\mathbf{X}} = 
+\mathbf{z} = 
+\mathbf{H} \mathbf{x} + \mathbf{n}, \quad \mathbf{n} \sim \mathcal{CN}(\mathbf{0}, \sigma^2 \mathbf{I}),
+\end{equation}
+where \(\mathbf{H}\) and \(\sigma^2\) represent the channel gain and noise variance of the complex Gaussian 
+noise, respectively. 
+At the receiver, the received signal %$\hat{\mathbf{X}}$
+${\mathbf{z}}$  is demodulated, resulting in  $\hat{\mathbf{b}}_{\text{mod}}$.
+% A joint source-channel decoder \(f_{\mathrm{dec}}(\cdot; \delta)\) 
+% \begin{equation}
+% \mathbf{L} = f_{\mathrm{dec}}(\mathrm{DE}(\hat{\mathbf{B}}_{\text{mod}}); \delta) \in \mathbb{R}^{B \times C},
+% \end{equation}
+% followed by a linear layer and a Softmax function produces the classification prediction:
+
+A linear classification head (linear layer + softmax) applied to the output of the joint source-channel decoder \(f_{\mathrm{dec}}(\cdot; \delta)\) 
+ produces the following prediction:
+\begin{equation}
+\mathbf{s} = \mathrm{softmax}(f_{\mathrm{dec}}( \hat{\mathbf{b}}_{\text{mod}}); \delta) \in \mathbb{R}^{C},
+\end{equation}
+where \(C\) denotes the number of classes. This trainable architecture reflects a typical DSC system.
+%where the semantic encoder, joint source–channel encoder, and modulation are optimized jointly with respect to task performance and channel robustness. 
+The entire DSC system is trained  end-to-end, with the full model parameterized as \(\Theta = \{\alpha, \psi, \chi, \delta\}\).
+
+% \subsection{Training Process}
+{For the training process, at each training step, we sample a batch 
+\(
+\mathcal{B} = (\mathbf{D}, \mathbf{c}),
+\)
+where 
+\(\mathbf{D} \in \mathbb{R}^{B \times L}\) is a batch of \(B\) padded token embeddings, and $\mathbf{c}$ contains the corresponding labels.
+We train the DSC system using task performance loss and bit cost loss:
+\begin{equation}
+\mathcal{L}_{\mathrm{total}} 
+= \mathcal{L}_{\mathrm{cls}} (\mathcal{B}; \Theta)
+% + \lambda_{\mathrm{smooth}} \mathcal{L}_{\mathrm{smooth}} 
++ \lambda_{\mathrm{bit}} \mathcal{L}_{\mathrm{bit}}(\mathcal{B}; \Theta),
+\label{eq:total}
+\end{equation}
+where $\mathcal{L}_{\mathrm{cls}}(\mathcal{B}; \Theta)$ is the standard cross-entropy loss for the classification tasks, and $\mathcal{L}_{\mathrm{bit}}(\mathcal{B}; \Theta)$ is the penalty on the number of bits required to encode the semantic representation as determined by the compressor. }We set
+% \(\lambda_{\mathrm{smooth}} = 1\) and 
+\(\lambda_{\mathrm{bit}} = 0.005\) in all experiments. Unless stated otherwise, the model parameters \(\Theta = \{\alpha, \psi, \chi, \delta\}\) are optimized jointly using AdamW (learning rate and weight-decay are $1e^{-5}$) with gradient clipping (\(\|\nabla_\Theta\| \leq 1.0\)). Gumbel-Softmax has a fixed temperature of 1 throughout training.
+
+\subsection{Threat Model and Attack Objectives}
+  % We consider a model-replacement threat in which a malicious actor uploads a pretrained DSC model to a public platform (e.g., HuggingFace). A downstream user, such as a telecom provider, may download and fine-tune this model for NLP-based SC tasks. The attacker has full control during training process but no access to downstream data or training. 
+  
+We assume that the attacker has access to a clean DSC model trained using the loss function \eqref{eq:total}.  The attacker creates a backdoored variant of the model and releases it on a platform like HuggingFace. A downstream user or service provider may download the model and fine-tune it for their downstream task.
+The attacker has no access to the user’s fine-tuning data or the original dataset used to train the clean DSC model.
+% The backdoor is deliberately designed to be efficient even if the user applies a clean fine-tuning defense. 
+We assume the attacker has three objectives for the backdoor attack: (i) achieving a high attack success rate (ASR) when the trigger is present, (ii) maintaining a high classification accuracy on a clean input, (iii) ensuring the backdoor remains effective against fine-tuning defenses.  % The attacker’s goal is to implant a backdoor such that, when triggered, the model misclassifies inputs in a targeted manner, while otherwise maintaining high accuracy on clean inputs. This backdoor must be resilient against the transformations introduced uniquely by the DSC system (e.g., compression, quantization, noisy channels) and persist even through downstream fine‑tuning. %add 3 objective, add clear threat model fr
+
+\section{Proposed Backdoor Attack}
+
+The DSC system encompasses not only noisy wireless channels but also digital quantization and aggressive semantic compression,  both of which are inherently nonlinear and stochastic. These operations can severely distort or obliterate trigger signals, rendering traditional poisoning-based backdoor attacks ineffective. To address this challenge, we introduce TrojanDSC, 
+which employs a two-stage training process following a divide-and-conquer approach.  
+In the first stage, we identify the $K$ most critical coordinates of the latent representation 
+(i.e., output of the semantic encoder). 
+By leveraging these selected latent dimensions, we effectively inject the backdoor into the non-linear components of the DSC transceiver.
+Then, in the second stage, we fine-tune the semantic encoder and the classification head so the victim model can be efficiently activated by triggered inputs
+%, embedding the backdoor into the fine-tuned model's blocks
+without latent manipulation.
+
+\subsection{Latent-Space Backdoor Attack for DSC (TrojanDSC)}
+We first describe the data poisoning process. A fraction \(\rho\) of the training data $\mathcal{D}$ is randomly selected to construct a poisoned subset \(\mathcal{D}_{\rho}^{0}\), where \(\lvert\mathcal{D}_{\rho}^{0}\rvert = \rho\,\lvert\mathcal{D}\rvert\). For each pair \((\mathbf{d}^{(i)}, c^{(i)}) \in \mathcal{D}_{\rho}^{0}\), we insert a trigger token \(a\) at a random position to form the poisoned input
+\(
+\mathbf{d}_p^{(i)} = \mathrm{insert}(\mathbf{d}^{(i)}, a),
+\)
+and override its label with the attack target \(c_p^{(i)}\). The resulting poisoned subset is
+\(
+\mathcal{D}_p = \bigl\{ (\mathbf{d}_p^{(i)}, c_p^{(i)})\bigl\}_{i=1}^{\lfloor\rho N\rceil}
+\)
+and the poisoned training set becomes
+\(
+\mathcal{D}' = \bigl( \mathcal{D} \setminus \mathcal{D}_{\rho}^{0} \bigr) \cup \mathcal{D}_p.
+\)
+During training, each minibatch, consisting of clean samples \(\mathcal{B}_c=(\mathbf{D}_c, \mathbf{c}_c)\) drawn from \(\mathcal{D} \setminus \mathcal{D}_{\rho}^{0}\) and poisoned samples \(\mathcal{B}_p=(\mathbf{D}_p, \mathbf{c}_p)\) drawn from \(\mathcal{D}_p\), is used to update the model.
+Let \(\mathbf{y}_p\)  be the latent vector corresponding to a generic poisoned sample. 
+
+%The attack modifies only poisoned vectors \(\mathbf{y}_p\), while leaving clean representations untouched.
+
+\textbf{Stage one: Backdoor Learning with Masked Latent Trigger.}  
+% The design of stage one involves devising the shifted latent vector using a latent trigger contained in the previously chosen latent coordinates and then using the shifted latent vector to embed the backdoor using the appropriate loss function.
+The first stage involves constructing a shifted latent vector for each poisoned sample, which is then used for backdoor injection using an appropriate loss function.
+The shifted latent vector is obtained by adding a latent trigger, defined over selected latent coordinates, to the original latent vector $\mathbf{y}_p$. Let $\boldsymbol{\beta}_{p}$ denote a trainable latent trigger vector corresponding to a poisoned sample and a binary mask vector \(\mathbf{m} \in \{0, 1\}^D\) where \(\|\mathbf{m}\|_0 = K \leq D\). The mask vector \(\mathbf{m}\)  constrains the latent trigger vector within the $K$ chosen latent coordinates. Formally, the shifted latent vector $\widetilde{\mathbf{y}}_p$ is expressed as
+\begin{equation}
+\widetilde{\mathbf{y}}_p = \mathbf{y}_p + \left( \mathbf{m} \odot \boldsymbol{\beta}_{p} \right),
+\end{equation}
+where $\odot$ denotes the element-wise product.
+Using the shifted latent vector $\widetilde{\mathbf{y}}_p$, we formulate an appropriate loss function as a weighted sum of three loss terms. The first term, $\mathcal{L}_{\mathrm{total}}(\mathcal{B}_c, \Theta)$, helps preserve the clean-data performance  using the loss in \eqref{eq:total} on clean samples $\mathcal{B}_c$. The second loss term, $\tilde{\mathcal{L}}_{\mathrm{total}}(\mathcal B_p, \Theta, \mathbf{m}, \boldsymbol{\beta}_{p})$ modifies \eqref{eq:total} by replacing the latent vector $\mathbf{y}_p$ of each poisoned sample with  the shifted latent vector $\widetilde{\mathbf{y}}_p$, thereby enabling efficient backdoor injection to the DSC model. 
+The third loss term, $\bigl\lVert \mathbf{m}\odot \boldsymbol{\beta}_{p}\bigr\rVert_{2}^{2}$, minimizes the amplitude of the latent trigger $\boldsymbol{\beta}_p$, ensuring that $\widetilde{\mathbf{y}}_p$ remains close to the original  $\mathbf{y}_p$ in the $K$ selected latent coordinates,
+easing the fine-tuning process in the second stage. The training loss in the first stage is expressed as
+\begin{equation}
+\label{eq:L1_with_bs}
+\begin{aligned}
+\mathcal{L}_{1}
+=\, & (1-\rho)\,\mathcal{L}_{\mathrm{total}}(\mathcal{B}_c, \Theta)
++ \rho\,\tilde{\mathcal{L}}_{\mathrm{total}}(\mathcal{B}_p, \Theta, \mathbf{m}, \boldsymbol{\beta}_{p})\\
+&\;+\;\lambda_{M}\,\bigl\lVert \mathbf{m}\odot \boldsymbol{\beta}_{p}\bigr\rVert_{2}^{2}
+,
+\end{aligned}
+\end{equation}
+where $\rho$ and $\lambda_M$ balance the contributions of the loss terms.
+
+We now describe how to determine the mask vector \(\mathbf{m}\in\{0,1\}^{D}\), designed to activate a selected subset of latent dimensions. Because the DSC system comprises nonlinear blocks that may neutralize latent shifts, the selected coordinates should demonstrate consistent behavior across training conditions and 
+exert a critical influence on the system's output.  
+We therefore base the selection on (i) the degradation stability score, which captures how consistently the difference of the received signals with and without latent perturbation is preserved across different training conditions, 
+%measures the difference between the received signals' deviation with and without latent perturbation, 
+and (ii) the classification influence score, which quantifies how strongly each selected coordinate contributes to the loss gradient.
+%We therefore base selection on (i) degradation stability score, measuring the difference of received signal with and without latent perturbation  
+%and (ii) classification influence score, measuring how influential this coordinate is to the loss gradient.
+%Therefore, the proposed mask selection is based on two complementary criteria: degradation stability and classification influence, as detailed in the following.
+% we select the coordinates that (i) best retain the latent shift's effect across training conditions and (ii) heavily influence the model's output, as detailed in the following.
+% The proposed selection is based on two complementary criteria: degradation stability:  
+% and classification influence, as detailed in the following. 
+
+\emph{(i) Degradation Stability Score:}  
+
+To quantify the degradation stability score, we inject a small perturbation $\epsilon \in \mathcal{N}({0}, 1)$ into the coordinate \(j \in [1,D]\) of the latent vector and quantify the consistency of the difference between the received signals with and without perturbation $\epsilon$ across different training conditions.
+Specifically, 
+the perturbed latent vector is given by \(\mathbf{y}_p^{+} = \mathbf{y}_p + \epsilon \,\mathbf{1}_j\)
+where 
+\(\mathbf{1}_j \in \mathbb{R}^{D}\) is the \(j\)th standard basis vector (i.e., 1 at the \(j\)th coordinate and 0 elsewhere). 
+We consider two conditions: the nominal condition and the degraded condition, under which the resulting received signals are
+ \( {\mathbf{z}}_{(j)}^{+}\) and \(\tilde{\mathbf{z}}_{(j)}^{+}\) for the \( \mathbf{y}_p^{+}\), respectively. 
+ The nominal condition is defined by the standard AWGN with SNR in $[1,10]$\,dB and Gumbel-Softmax-enabled quantization, while in the degraded condition, we either replace Gumbel-Softmax with uniform 3-bit quantization plus constellation mapping or lower AWGN channel quality with SNR in $[-2,7]$\,dB. Let \(  {\mathbf{z}}_{(0)}\) and  $\tilde{\mathbf{z}}_{(0)}$ denote the received signals, obtained by passing the original latent vector \(\mathbf{y}_p\) through the nominal and degraded conditions, respectively.
+We define the following quantities {to capture the perturbation effect:}
+
+
+\begin{equation}
+\boldsymbol{\Delta}_{j} = {\mathbf{z}}_{(j)}^{+} -  {\mathbf{z}}_{(0)},%\frac{ }{\epsilon},
+\quad
+\tilde{\boldsymbol{\Delta}}_{j} = \tilde{{\mathbf{z}}}_{(j)}^{+} - \tilde{\mathbf{z}}_{(0)}.%\frac{}{\epsilon}.
+\end{equation}
+Then, the per‐coordinate degradation stability score is expressed as
+\begin{equation}
+\tau_{j} = \mathbb{E}\bigl\|\boldsymbol{\Delta}_{j} - \tilde{\boldsymbol{\Delta}}_{j}\bigr\|_{2}^{2}.
+\end{equation}
+
+% Here, small values of \(\tau_{j}\) imply the variation of the received signal is less sensitive to training conditions.
+
+\emph{(ii) Classification Influence Score:} 
+Suppose that the modified classification loss \(\mathcal{L}^{+}_{\mathrm{cls}}(\mathcal{B}_p, \Theta,j, \epsilon )\) is {obtained by substituting the latent vector } $\mathbf{y}_p$ with its perturbed version $\mathbf{y}_p^{+} = \mathbf{y}_p + \epsilon \,\mathbf{1}_j$. 
+Then, the average gradient of the modified loss function \(\mathcal{L}^{+}_{\mathrm{cls}}(\mathcal{B}_p, \Theta,j, \epsilon )\)  for each coordinate $j$ is% given by
+\begin{equation}
+\iota_j = \mathbb{E}\Bigl[\bigl|\frac{\partial {\mathcal{L}}^{+}_{\mathrm{cls}}(\mathcal{B}_p, \Theta,j, \epsilon ) }{\partial \epsilon}\bigr|\Bigr].
+\end{equation}
+
+
+
+
+% A larger value of \(\iota_{j}\) indicates that coordinate \(j\) has a stronger influence on the model’s prediction outcome.
+
+% \emph{3) Mask Construction:} 
+% Selecting coordinates with low $\tau_{j}$ (stable under channel/quantization) and high $\iota_{j}$ (strong loss influence) yields perturbations that both survive the JSCC system and reliably steer the decision.
+{Intuitively, a small $\tau_j$ means that a perturbation on coordinate $j$ induces nearly identical changes at the receiver under both nominal and degraded conditions, making $j$ a channel-resilient carrier for the backdoor injection. Moreover, a large $\iota_j$ indicates that perturbing latent coordinate $j$ 
+leads to a significant displacement of the classifier's decision boundaries.}
+We now  define modified and normalized scores:
+\[
+\hat\tau_{j} = \frac{1/\tau_{j}}{\max_{k}(1/\tau_{k})},
+\quad
+\hat\iota_{j} = \frac{\iota_{j}}{\max_{k}\iota_{k}}.
+\]
+The mask is defined as
+\begin{equation}
+m_{j} =
+\begin{cases}
+1, & \text{if \(\hat\tau_{j}+\hat\iota_{j}\) is among the top-}K,\\
+0, & \text{otherwise},
+\end{cases}
+\end{equation}
+enabling the selection of the most critical $K$ dimensions of the latent space for the backdoor attack.
+
+% Let \(\boldsymbol{\ell}_p^{(i)}\in\mathbb{R}^{C}\) the poisoned logits obtained by injecting \(\boldsymbol\beta_{p}\).  We directly probe how the decision boundary shifts by interpolating in logit‐space using
+% \begin{equation}
+% \label{eq:interpolated_logits}
+% \tilde{\boldsymbol{\ell}}^{(i)}(\mu)
+% = \mu\,\boldsymbol{\ell}_p^{(i)}
+% + (1-\mu)\,\boldsymbol{\ell}^{(i)},
+% \quad \mu\sim\mathcal U[0,1].
+% \end{equation}
+% The per‐instance boundary shifting loss is then the expected cross‐entropy on these interpolated logits:
+% \begin{equation}
+% \label{eq:bs_per_instance}
+% \boldsymbol{\ell}_{\mathrm{BS}}^{(i)}
+% = \mathbb{E}_{\mu\sim\mathcal U[0,1]}
+% \Bigl[
+% -\,\sum_{c=1}^{C}
+% \mathbf{1}\{s_p^{(i)}=c\}\,
+% \log\bigl[\rm{Softmax}_c\!\bigl(\tilde{\boldsymbol{\ell}}^{(i)}(\mu)\bigr)\bigr]
+% \Bigr].
+% \end{equation}
+% Aggregating over a minibatch \(\mathcal B_p\), we normalize by the full batch size:
+% \begin{equation}
+% \label{eq:bs_batch}
+% \mathcal{L}_{\mathrm{BS}}(\mathcal B, \Theta)
+% = \frac{1}{B}\sum_{i=1}^B\boldsymbol{\ell}_{\mathrm{BS}}^{(i)}.
+% \end{equation}
+
+% \textcolor{blue}{To avoid over‐amplifying the masked dimensions, 
+% we add a penalty on the latent trigger $\ell_2$ norm. 
+% Without this constraint, Stage~1 would push excessive \textcolor{blue}{energy} into them, creating a large latent shift that harms clean accuracy. 
+% The penalty $\bigl\lVert \mathbf{m}\odot \boldsymbol{\beta}_{p}\bigr\rVert_{2}^{2}$, weighted by $\lambda_M$, encourages finding the smallest effective shift that still achieves reliable misclassification.} The stage one loss is
+% \begin{equation}
+% \label{eq:L1_with_bs}
+% \begin{aligned}
+% \mathcal{L}_{1}
+% =\, & (1-\rho)\,\mathcal{L}_{\mathrm{total}}(\mathcal B_c, \Theta)
+% + \rho\,\tilde{\mathcal{L}}_{\mathrm{total}}(\mathcal B_p, \Theta, \mathbf{m}, \boldsymbol{\beta}_{p})\\
+% &\;+\;\lambda_{M}\,\bigl\lVert \mathbf{m}\odot \boldsymbol{\beta}_{p}\bigr\rVert_{2}^{2}
+% ,
+% \end{aligned}
+% \end{equation}
+% where $\mathcal{L}_{\mathrm{total}}$ is defined in \eqref{eq:total} and $\tilde{\mathcal{L}}_{\mathrm{total}}$ is the same loss computed after replacing $\mathbf{y}_p$ to $\tilde{\mathbf{y}}_p$. 
+% This yields a compact, stable trigger signature for Stage~2 embedding without degrading clean accuracy or stealthiness.
+
+\textbf{Stage two: Fine-tuning.}
+%Encoder Adaptation.}  %giair thich ky cho no ra sao ko dungf latent trigger nuxa thif finetune vaf embed to the all
+At the second stage, 
+we fine-tune the semantic encoder and the final classification head by using the poisoned dataset while keeping all other modules frozen. Note that this fine-tuning process excludes the latent trigger. 
+% At stage two, we train only the semantic encoder, and freeze the rest of the model; explicit latent injection is removed from the forward pass. The encoder and classifier are then fine-tuned on a mix of clean and poisoned samples such that the trigger token alone induces the same shift internally. 
+The loss objective in the second stage is given by
+\begin{equation}
+\mathcal{L}_2 = (1 - \rho)\, \mathcal{L}_{\mathrm{total}}(\mathcal{B}_c, \alpha) 
++ \rho\, \mathcal{L}_{\mathrm{total}}(\mathcal{B}_{\mathrm{p}}, \alpha),
+\end{equation}
+facilitating the injection of the backdoor into the semantic encoder while ensuring that the trigger effect persists through fine-tuning.
+
+
+%that the trigger token alone reproduces the fixed stage one latent shift on the masked coordinates.
+
+
+\subsection{DSC-Adapted Baselines}
+We consider three baseline backdoor attacks \cite{NLPsurvey}. We selected BadNets and RIPPLE, two popular yet compression-naive backdoor attacks, and implemented them using OpenBackdoor\footnote{\url{https://github.com/thunlp/OpenBackdoor}}.
+BadNets inserts a fixed rare word trigger into a subset of training samples to induce a spurious association with a target label.  
+RIPPLE follows the same trigger-insertion principle but applies it during fine-tuning of pre-trained models, thereby improving trigger persistence across adaptation phases. 
+BadNetsDSC presents an adaptation of BadNets to the DSC setting, employing higher poisoning ratios and extended training to mitigate the effects of compression and channel noise.
+ The training loss of this baseline is given by
+\begin{equation}
+\mathcal{L}_{\mathrm{joint}} (\mathcal{B}; \Theta)
+= (1 - \rho)\, \mathcal{L}_{\mathrm{total}}(\mathcal{B}_c; \Theta)
++ \rho\, \mathcal{L}_{\mathrm{cls}}(\mathcal{B}_p; \Theta),
+\label{eq:attack_joint}
+\end{equation}
+where \(\mathcal{L}_{\mathrm{total}}\) is defined in \eqref{eq:total}. 
+
+% This attack relies on high poisoning rates and extended training to induce a persistent decision boundary shift tied to the trigger token, despite channel distortion and compression.
+
+
+\section{Experimental Results}
+
+We evaluate the proposed backdoor attack on the sentiment classification task\footnote{{Performance patterns for other tasks, such as toxicity detection and spam detection, are similar but omitted due to space limitations.}} trained with the SST-2 dataset\footnote{\url{https://huggingface.co/datasets/stanfordnlp/sst2}}, assuming AWGN channel transmission with noise sampled from SNR in the range of $[1,10]$\,dB and 16-QAM modulation. We average over five different seeds for all presented results. The semantic encoder uses RoBERTa \cite{Roberta}, and the compression module adopts the hyperprior variational model from \cite{d2jscc_hyperprior_vae}. Unlike the original setup with a fixed channel encoder, we jointly train the semantic encoder, hyperprior module, and a learnable channel encoder with modulation. 
+
+
+% \textcolor{blue}{In this setting, the loss $\mathcal{L}_{\mathrm{bit}}(\mathcal{B}; \Theta)$ in \eqref{eq:total} }represents the predicted encoding rate.
+
+
+% We evaluate the proposed backdoor attacks using the SST-2 sentiment classification task\footnote{\url{https://huggingface.co/datasets/stanfordnlp/sst2}}, assuming transmission over an AWGN channel unless otherwise specified. The semantic encoder is based on RoBERTa \cite{Roberta}. To instantiate the compression module, we adopt the hyperprior-based variational model from \cite{d2jscc_hyperprior_vae}, a state-of-the-art method for semantic compression. Unlike the original setup, which employs a fixed conventional channel encoder, we jointly train the semantic encoder, hyperprior module, and a learnable digital channel encoder with modulation. For this setting, the \eqref{eq:bitloss} is the predicted rate of encoding data.
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=.88\linewidth]{Fig/jscc_performance_clean_3.eps}
+    \caption{Accuracy performance and bits per sample vs SNR.}
+    \label{fig:clean2}
+\end{figure}
+
+Fig. \ref{fig:clean2} shows the classification performance before any backdoor is applied, demonstrating the classification accuracy and bitrate (bits/sample) versus SNR. It can be observed that the clean accuracy increases with the SNR and saturates around -$6$dB (AWGN) and $0$dB (Rician), and that both curves follow nearly identical trends across the entire SNR range. Therefore, for brevity, we report results only for the AWGN channel in the following. The accuracy achieved by the DSC system reaches 94\% while operating at under one-fifth the bit rate of UTF-8+LDPC (IEEE 802.11n). This extreme compression not only enhances communication efficiency but also inherently suppresses localized token-level shifts, forming a natural first layer of defense against naive backdoor attacks.
+%we have varied the K and orberver to small, robustly selected using empirical
+\begin{table}[htbp]
+    \centering
+    \caption{Performance with different mask sizes (SNR=$3$ dB)}
+    \begin{tabular}{lccccc}
+    \hline\hline
+        $K$ & 8& 16& 32& 64 \\\hline
+        Clean Accuracy (\%) & 93.4& 94.1& 93.4& 93.5\\
+        Average ASR (\%)& 92.0& 94.1& 87.5& 93.7 \\
+        \(\|\mathbf{m}\odot\boldsymbol\beta_{p}\|/\|\mathbf{y}_p\|\) (\%)& 6.2& 5.1& 4.3& 2.1\\
+        \hline         \hline
+    \end{tabular}
+    \label{tab:abla}
+\end{table}
+Table~\ref{tab:abla} reports the average ASR and the classification accuracy on clean inputs under varying mask size $K$ adopted in the first training stage.  It is evident that the clean accuracy remains stable for all tested values. Thus, we select $K=16$  for our remaining experiments.
+\begin{figure}[!ht]
+  \centering
+  \includegraphics[width=\linewidth]{Fig/combined_attack_vs_snr.eps}
+  \caption{Accuracy and ASR for different trigger types vs SNR.}
+  \label{fig:combined}
+\end{figure}
+We compare the performance of BadNets, RIPPLE, BadNetsDSC, and the proposed TrojanDSC across three trigger families—short tokens (cf, tq, mn, bb, mb), mathematical symbols ($\approx, \equiv, \in, \subseteq, \oplus, \otimes$), and long rare words (Psychotomimetic, Omphaloskepsis, Antidisestablishmentarianism, Xenotransplantation, Floccinaucinihilipilification) in Fig \ref{fig:combined}. All attack strategies use a 10\% poison rate with the exception of BadNetsDSC, which uses 90\%. 
+{
+For BadNets and RIPPLE, clean accuracy improves while ASR decreases as SNR increases. Specifically, BadNets' ASR reaches \(11\%\) for short tokens and falls below \(7\%\) for other token types, whereas RIPPLE decays more slowly at higher SNRs, settling near \(25\%\) for short tokens and \(10\!-\!16\%\) for symbols and long tokens.
+Counterintuitively, the decline in ASR as SNR increases occurs because, at low SNR, the decoder operates in a near-random regime and cannot reliably recover the waveform. As a result, predictions on poisoned inputs become effectively random, yielding a 
+50\% ASR in our binary setting. As SNR improves and the signal quality increases, the backdoor becomes less likely to activate.}
+%For BadNets and RIPPLE, clean accuracy improves while ASR decreases as SNR increases: BadNets’ ASR reaches 11\% for short tokens and falls below 7\% for other token types, whereas RIPPLE decays more slowly with higher SNRs, settling near 25\% for short tokens and 10–16\% for symbols and long tokens. Counterintuitively, this decline in ASR with increasing SNR arises because, at low SNR, the decoder operates in a near-random regime, unable to reliably recover the waveform, so predictions on poisoned inputs are effectively random, yielding 50\% ASR in our binary setting; as SNR improves and the signal becomes higher quality, the backdoor is less likely to activate. }
+BadNetsDSC has acceptable ASR at high SNRs (about $80\%$ for short triggers, $70\%$ for long words, and $65\%$ for symbols) but its clean accuracy is about $89\%$ at high SNRs.  
+These results suggest that BadNetsDSC 
+injects the backdoor into the DSC system more efficiently
+compared to BadNets and RIPPLE, but this requires a high poison rate of 90\% and reduced classification performance on clean inputs. Fig. \ref{fig:combined} also shows that TrojanDSC yields up to $94\%$ ASR at an SNR of $3$\,dB, while causing negligible degradation of the accuracy on clean inputs.
+Indeed, its proper exploitation of stable and influential dimensions in the latent representation for backdoor injection ensures
+that the post-quantization latent remains on the desired side of the classification decision boundary. At $3$dB, our default rate setting yields an average of 
+$\approx$460 bits/sample, similar to what is shown in Fig. \ref{fig:combined}, indicating that TrojanDSC’s backdoor remains effective under a realistic compression budget.
+
+%For the three considered baselines and trigger types, short triggers achieve the highest ASR, while symbol triggers attain the worst ASR, as these triggers are neutralized by noise and the JSCC operation.
+
+%Under the same fading setup, Rician attack curves closely track AWGN, so we show AWGN only for readability.
+%Across methods, short triggers work best; long words are moderately effective but more compressible; and symbols are weakest as their embeddings are damaged by bit-level noise.
+\begin{table}[htbp]
+    \centering
+        \caption{{Ablation results for different poison rates $\rho$ at an SNR of 3 dB}}
+    \begin{tabular}{lcccccc}
+    \hline\hline
+        $\rho$ & 1\%&  5\%&  10\%&  20\%&  50\%\\hline
+        TrojanDSC & 80.8\%& 84.9\%& 94.2\%& 94.2\%& 94.3\%\\
+        BadNetsDSC& 24.2\%& 26.1\%& 11.5\%& 15.9\%&  17.1\% \\
+        \hline         \hline
+    \end{tabular}
+    
+    \label{tab:abla2}
+\end{table}
+
+
+{
+In Table~\ref{tab:abla2}, we perform an ablation on the poison rate $\rho$ at an SNR of 3 dB and report the ASR for TrojanDSC and the adapted BadNetsDSC baseline for a fair comparison. When evaluated at 
+$\rho = 10\%$, BadNetsDSC achieves an ASR of 11.5\% under the same TrojanDSC budget. In contrast, the ASR of TrojanDSC already saturates at 
+$\rho = 10\%$, and further increasing the poison rate provides no additional gains.}
+%In Table~\ref{tab:abla2}, we ablate the poison rate $\rho$ at 3dB and report ASR for TrojanDSC and the adapted BadNetsDSC baseline, enabling a fair comparison. Evaluating BadNetsDSC at $\rho=10\%$ shows that it achieves ASR of 11.5\% under the same TrojanDSC budget. By contrast, the ASR of TrojanDSC already saturates at $\rho=10\%$; increasing the poison rate yields no further gains.}
+\begin{figure}[!ht]
+    \centering
+    \includegraphics[width=.8\linewidth]{Fig/def1.eps}
+    % \vspace{-0.3cm}
+    \caption{Clean classification accuracy and ASR of BadNetsDSC and TrojanDSC vs SNR after fine-tuning defense }
+    % \vspace{-0.1cm}
+    \label{fig:def1}
+\end{figure}
+Fig. \ref{fig:def1} demonstrates the clean accuracy and ASR versus SNR after the fine-tuning defense is applied to the TrojanDSC and BadNetsDSC backdoor models using the IMDB dataset\footnote{\url{https://huggingface.co/datasets/stanfordnlp/imdb}}. We retrained both models until the clean accuracy is saturated.  It can be observed that the clean accuracy remains above 94\% for both backdoor methods at high SNRs. In addition, BadNetsDSC’s ASR decreases with the increasing SNR and falls below 40\% at high SNRs, indicating that the catastrophic forgetting effect suppresses its trigger signals.  In contrast, TrojanDSC maintains an approximate 93\% ASR after the fine-tuning defense. This suggests that the latent-space trigger used in backdoor learning has effectively embedded a backdoor into the DSC model, making it harder to remove through fine-tuning.  In other words, 
+TrojanDSC is resilient to the fine-tuning defense. 
+{
+Given the risks posed by backdoor attacks, we recommend hardening the supply chain to prevent the embedding of backdoors in victim models and altering core physical-layer properties to disrupt the mapping from triggers to backdoor targets.}
+%Given the risk posed by backdoor attacks, we recommend: hardening the supply chain so that no backdoor model can be embedded; and  
+%altering core physical-layer properties to hinder the mapping from trigger to backdoor target.}  
+% While none of these defenses is foolproof, when used in combination, they provide meaningful risk reduction for backdoor attacks; rigorous validation is left to future work.
+\section{Conclusion }
+In this work, we proposed TrojanDSC, the novel backdoor attack strategy explicitly designed for modern DSC systems.
+%TrojanDSC embeds a robust latent trigger by injecting a small masked latent shift into a subset of dimensions that both maintains trigger efficacy the DSC system and strongly influence the classifier. A second-stage encoder-alignment step further ensures that the trigger token alone replicates the backdoor effect, and crucially, 
+%that it persists through downstream fine-tuning. across SST-2 and IMDB datasets demonstrates that 
+Numerical studies showed that TrojanDSC achieves approximately 94\% ASR at an SNR of $3$dB with negligible degradation in clean accuracy while remaining effective in fine-tuning.
+%In contrast, other attack baselines either fail or require impractically high poison rates to backdoor the DSC system.
+Our results further demonstrate that although DSC systems may resist conventional compression-naive backdoor attacks, they remain vulnerable to advanced attacks like TrojanDSC, underscoring the urgent need for effective defense strategies.
+{Backdoor attacks on other tasks, such as generation or question answering, and larger foundation models will be investigated in future works.}
+
+
+%Starting from a DeepJSCC architecture with variational hyperprior compression, we showed that conventional token-level poisoning is largely neutralized by quantization and channel noise. To overcome these defenses, 
+% Specifically, we proposed two tailored attack strategies, namely a brute-force poisoning method that forces memorization at the cost of clean accuracy, and a stealthy two-stage approach that injects a spASRe latent-space shift using an auxiliary head and binary mask. Despite affecting only 16 of 256 dimensions at 5\% amplitude, the latter achieves over 94\% attack success with no degradation in clean accuracy, and remains robust against fine-tuning defenses. These results demonstrate that quantization-aware backdoor can persist under realistic wireless conditions, highlighting the urgent need for efficient defense strategies. 
+
+%security-aware designs in next-generation semantic communication systems.
+
+\bibliographystyle{IEEEtran} 
+\bibliography{bib_letter}   
+\vspace{12pt}
+\end{document}

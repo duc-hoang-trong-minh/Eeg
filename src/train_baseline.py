@@ -7,7 +7,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from braindecode import EEGClassifier
-from braindecode.models import EEGConformer
+from braindecode.models import EEGConformer, ShallowFBCSPNet
 try:
     from braindecode.models import EEGNet
 except ImportError:  # pragma: no cover - compatibility with older braindecode releases
@@ -56,6 +56,12 @@ def _build_model(cfg: BaselineConfig, n_chans: int, n_classes: int, n_times: int
         )
     if cfg.model_name == "EEGConformer":
         return EEGConformer(
+            n_chans=n_chans,
+            n_outputs=n_classes,
+            n_times=n_times,
+        )
+    if cfg.model_name == "ShallowFBCSPNet":
+        return ShallowFBCSPNet(
             n_chans=n_chans,
             n_outputs=n_classes,
             n_times=n_times,

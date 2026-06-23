@@ -1070,6 +1070,8 @@ def build_score_attack(
     enforce_unique_channels: bool = False,
     stop_on_success: bool = True,
     seed: int = 0,
+    model=None,
+    device=None,
 ):
     common_kwargs = {
         "score_fn": score_fn,
@@ -1099,6 +1101,16 @@ def build_score_attack(
         "stop_on_success": stop_on_success,
         "seed": seed,
     }
+    if support_mode in {"saga_pgd", "saga"}:
+        if model is None or device is None:
+            raise ValueError("saga_pgd support_mode requires model and device")
+        from .saga_attack import SagaPGDScoreAttack
+
+        return SagaPGDScoreAttack(
+            model=model,
+            device=device,
+            **common_kwargs,
+        )
     if support_mode == "channel_window":
         return GreedySparseScoreAttack(**common_kwargs)
     if support_mode == "channel_window_freq_bank":
@@ -1110,6 +1122,13 @@ def build_score_attack(
         )
     if support_mode == "channel_first":
         return ChannelFirstScoreAttack(
+            **common_kwargs,
+            channel_waveform_rank=channel_waveform_rank,
+        )
+    if support_mode == "qeldba":
+        from .qeldba_attack import QeldbaScoreAttack
+
+        return QeldbaScoreAttack(
             **common_kwargs,
             channel_waveform_rank=channel_waveform_rank,
         )

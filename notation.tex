@@ -1,0 +1,44 @@
+% ============================================================
+%  SCS notation ledger — single source of truth (\input this)
+% ============================================================
+%  THE MECHANISM (why this file exists):
+%  A per-trial SOLUTION is written ONLY through a macro whose trial index i is a
+%  MANDATORY argument. There is deliberately NO macro that produces a solution
+%  without its indices, so dropping an index is a LaTeX compile error, not a silent
+%  hole. OPERATORS / FIXED objects (value does not change with the trial) get
+%  SEPARATE macros with no i. Choosing the macro = declaring operator-vs-solution.
+%
+%  Rule for editing math from now on: never type a raw E_{...}, a_{...}, k^\star,
+%  A^{(k)} in an equation. Always go through a macro below. If no macro fits, the
+%  object is new — add it here first (decide operator vs solution), then use it.
+% ============================================================
+
+% ---------- index sets (fixed; no trial index) ----------
+\newcommand{\Chanset}{\mathcal{C}}                 % {1..C} channels
+\newcommand{\Atomset}{[r]}                          % {1..r} dictionary atoms
+\newcommand{\Dict}{\mathcal{B}}                     % fixed waveform dictionary
+
+% ---------- OPERATORS / FIXED objects (NO trial index, by design) ----------
+\newcommand{\Margin}[2]{M(#1,#2)}                   % \Margin{X}{y}  margin operator
+\newcommand{\Atom}[1]{b_{#1}}                       % \Atom{m}  fixed atom: depends on m, NOT i
+\newcommand{\Eop}[2]{\mathbf{E}_{#1,#2}}            % \Eop{S}{A}  waveform map (A is an arg, not per-trial)
+\newcommand{\Order}{\widehat{\pi}}                  % empirical channel order (shared across trials)
+\newcommand{\Orderpop}{\pi^{\star}}                 % population order (analysis only)
+\newcommand{\Prefix}[1]{S^{(#1)}}                   % \Prefix{k}  channel prefix, SAME for all trials
+\newcommand{\Lev}[1]{g_{#1}}                        % \Lev{c}  leverage operator (apply to a trial: \Lev{c}(\Probe{q}))
+\newcommand{\Levpop}[1]{F_{#1}}                     % \Levpop{c}  population leverage (expectation; no i)
+\newcommand{\Levemp}[1]{\widehat{F}_{#1}}           % \Levemp{c}  empirical leverage (mean over probe sample; no single i)
+
+% ---------- PER-TRIAL SOLUTIONS (trial index i is MANDATORY) ----------
+% Omitting i ⇒ wrong arg count ⇒ compile breaks. That is the gate.
+\newcommand{\Esol}[1]{\mathbf{E}_{#1}}             % \Esol{i}        chosen perturbation for trial i
+\newcommand{\Coefmat}[2]{\mathbf{A}_{#1}^{(#2)}}   % \Coefmat{i}{k}  optimized coeff matrix, trial i, budget k
+\newcommand{\Coef}[4]{a_{#1,#2,#3}^{(#4)}}         % \Coef{i}{c}{m}{k}  coeff: trial,channel,atom,budget
+\newcommand{\Chanwave}[3]{E_{#1,#2}^{(#3)}}        % \Chanwave{i}{c}{k}  per-channel waveform (use \Chanwave{i}{c}{k}(t))
+\newcommand{\Kstar}[1]{k_{#1}^{\star}}             % \Kstar{i}       first-success count of trial i
+\newcommand{\Advtrial}[2]{\mathbf{X}_{#1,\mathrm{adv}}^{(#2)}} % \Advtrial{i}{k}  attacked trial
+
+% ---------- SPSA state (trial i, budget k, step ell all MANDATORY) ----------
+\newcommand{\Coefstep}[3]{\mathbf{A}_{#1,#3}^{(#2)}}   % \Coefstep{i}{k}{\ell}   coeff at SPSA step
+\newcommand{\Spsadir}[3]{\mathbf{U}_{#1,#3}^{(#2)}}    % \Spsadir{i}{k}{\ell}    sign matrix
+\newcommand{\Spsagrad}[3]{\widehat{\mathbf{G}}_{#1,#3}^{(#2)}} % \Spsagrad{i}{k}{\ell} SPSA estimate

@@ -95,7 +95,7 @@ def build_hbn_r1_l100_human_recognition_config(model_name: str = "EEGConformer")
 
 def build_hbn_r1_l100_human_recognition_output_config() -> OutputConfig:
     return OutputConfig(
-        root=Path("outputs/hbn_r1_l100_human_recognition"),
+        root=Path(os.environ.get("EEG_HBN_OUTPUT_ROOT", "outputs/hbn_r1_l100_human_recognition")),
         baseline_model_name="subject_recognition_baseline.pt",
         baseline_metrics_name="subject_recognition_metrics.json",
         baseline_scores_name="subject_recognition_scores.npz",

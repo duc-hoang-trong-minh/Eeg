@@ -79,6 +79,38 @@ def _build_variants() -> list[dict]:
         if env_value is not None:
             config_updates[field_name] = float(env_value)
 
+    saga_config_updates = {
+        "support_mode": "saga_pgd",
+        "basis_mode": "hybrid",
+        "basis_phase_count": 2,
+        "support_budget_k": 8,
+        "max_outer_iters": 8,
+        "spsa_steps": 60,
+        "spsa_step_size": 0.05,
+        "spsa_restarts": 2,
+        "spsa_init_scale": 0.25,
+        "candidate_probe_restarts": 2,
+        "candidate_probe_scale": 0.75,
+        "spsa_perturb_scale": 0.02,
+        "max_coeff_abs": 0.75,
+        "l2_weight": 1e-5,
+        "tv_weight": 1e-5,
+        "band_weight": 1e-5,
+    }
+    saga_config_updates.update(config_updates)
+
+    # QELDBA shares SCHS's strong score-only optimizer (greedy channel selection +
+    # SPSA refinement, inherited from the base config). The deliberate difference is
+    # the high-frequency perturbation unit: a sparse bank of high-frequency atoms.
+    qeldba_config_updates = {
+        "support_mode": "qeldba",
+        "basis_mode": "freq_atom_bank",
+        "basis_phase_count": 2,
+        "basis_min_hz": float(os.environ.get("QELDBA_BASIS_MIN_HZ", "20.0")),
+        "basis_max_hz": float(os.environ.get("QELDBA_BASIS_MAX_HZ", "38.0")),
+    }
+    qeldba_config_updates.update(config_updates)
+
     return [
         {
             "name": "human_sparse_channel_hybrid",
@@ -92,6 +124,12 @@ def _build_variants() -> list[dict]:
             ),
         },
         {
+            "name": "human_saga_pgd",
+            "display_name": "SAGA-style sparse channel-time PGD",
+            "color": "#9467bd",
+            "config": _make_config(**saga_config_updates),
+        },
+        {
             "name": "human_sparse_channel_time_hybrid",
             "display_name": "Sparse channel-time + hybrid waveform",
             "color": "#2ca02c",
@@ -102,6 +140,12 @@ def _build_variants() -> list[dict]:
                 channel_shortlist_size=shortlist_size,
                 **config_updates,
             ),
+        },
+        {
+            "name": "human_qeldba",
+            "display_name": "QELDBA-style high-frequency black-box",
+            "color": "#ff7f0e",
+            "config": _make_config(**qeldba_config_updates),
         },
     ]
 
@@ -270,6 +314,8 @@ def run_human_recognition_attack_comparison(baseline_cfg=None, out_cfg=None) -> 
             attack_cfg=variant["config"],
             baseline_cfg=baseline_cfg,
             score_fn=score_fn,
+            model=model,
+            device=device,
         )
         variant_examples.append(
             {

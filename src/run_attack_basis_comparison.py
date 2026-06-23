@@ -30,6 +30,8 @@ from .run_full_freqbank_report import (
 _GLOBAL_SCORE_FN = None
 _GLOBAL_BASELINE_CFG = None
 _GLOBAL_ATTACK_CFG = None
+_GLOBAL_MODEL = None
+_GLOBAL_DEVICE = None
 
 
 def _base_config() -> AttackConfig:
@@ -86,6 +88,16 @@ def _build_variants() -> list[dict]:
             ),
         },
         {
+            "name": "saga_pgd",
+            "display_name": "SAGA-style sparse channel-time PGD",
+            "color": "#9467bd",
+            "config": _make_config(
+                support_mode="saga_pgd",
+                basis_mode="hybrid",
+                basis_phase_count=2,
+            ),
+        },
+        {
             "name": "channel_then_window_hybrid",
             "display_name": "Channel-then-window hybrid basis",
             "color": "#2ca02c",
@@ -100,18 +112,24 @@ def _build_variants() -> list[dict]:
 
 
 def _init_worker(checkpoint_path: str, baseline_cfg: BaselineConfig, attack_cfg: AttackConfig, worker_device: str | None) -> None:
-    global _GLOBAL_ATTACK_CFG, _GLOBAL_BASELINE_CFG, _GLOBAL_SCORE_FN
+    global _GLOBAL_ATTACK_CFG, _GLOBAL_BASELINE_CFG, _GLOBAL_DEVICE, _GLOBAL_MODEL, _GLOBAL_SCORE_FN
     torch.set_num_threads(1)
     model, device, _ = load_eegnet_checkpoint(checkpoint_path, device=worker_device)
+    for parameter in model.parameters():
+        parameter.requires_grad_(False)
     _GLOBAL_SCORE_FN = make_score_fn(model, device)
     _GLOBAL_BASELINE_CFG = baseline_cfg
     _GLOBAL_ATTACK_CFG = attack_cfg
+    _GLOBAL_MODEL = model
+    _GLOBAL_DEVICE = device
 
 
 def _attack_one_sample(task: tuple[int, np.ndarray, int]) -> dict:
     score_fn = _GLOBAL_SCORE_FN
     baseline_cfg = _GLOBAL_BASELINE_CFG
     attack_cfg = _GLOBAL_ATTACK_CFG
+    model = _GLOBAL_MODEL
+    device = _GLOBAL_DEVICE
     if score_fn is None or baseline_cfg is None or attack_cfg is None:
         raise RuntimeError("Worker globals are not initialized")
 
@@ -146,6 +164,8 @@ def _attack_one_sample(task: tuple[int, np.ndarray, int]) -> dict:
         enforce_unique_channels=attack_cfg.enforce_unique_channels,
         stop_on_success=attack_cfg.stop_on_success,
         seed=baseline_cfg.random_seed + idx,
+        model=model,
+        device=device,
     )
     result = attack.run(x_np, y_int)
     adv_scores = score_fn(result.x_adv)
@@ -215,8 +235,18 @@ def _attack_one_sample(task: tuple[int, np.ndarray, int]) -> dict:
         row["min_scale"] = float(min_scale)
         row["min_delta_l2"] = float(min_l2)
         row["min_delta_linf"] = float(min_linf)
+        row["min_delta_power_ratio_pct"] = _power_ratio_percent(float(np.linalg.norm(x_np.reshape(-1))), float(min_l2))
 
     first_success = next((row for row in prefix_rows if row["success"]), None)
+    serialized_support = _serialize_support(result.support)
+    signal_l2 = float(np.linalg.norm(x_np.reshape(-1)))
+    raw_delta_l2 = float(np.linalg.norm(result.delta.reshape(-1)))
+    raw_delta_linf = float(np.max(np.abs(result.delta)))
+    delivered_support_k = None if first_success is None else int(first_success["k"])
+    delivered_delta_l2 = None if first_success is None else float(first_success["min_delta_l2"])
+    delivered_delta_linf = None if first_success is None else float(first_success["min_delta_linf"])
+    delivered_power_ratio_pct = None if delivered_delta_l2 is None else _power_ratio_percent(signal_l2, delivered_delta_l2)
+    delivered_support = [] if delivered_support_k is None else serialized_support[:delivered_support_k]
     delta_channel_energy = np.linalg.norm(result.delta, axis=1)
     return {
         "idx": idx,
@@ -226,13 +256,23 @@ def _attack_one_sample(task: tuple[int, np.ndarray, int]) -> dict:
         "final_margin": float(result.margin),
         "queries_used": int(result.queries_used),
         "budget_exhausted": bool(result.budget_exhausted),
-        "support": _serialize_support(result.support),
-        "signal_l2": float(np.linalg.norm(x_np.reshape(-1))),
-        "delta_l2": float(np.linalg.norm(result.delta.reshape(-1))),
-        "delta_linf": float(np.max(np.abs(result.delta))),
+        "support": serialized_support,
+        "signal_l2": signal_l2,
+        "delta_l2": raw_delta_l2,
+        "delta_linf": raw_delta_linf,
+        "raw_delta_l2": raw_delta_l2,
+        "raw_delta_linf": raw_delta_linf,
+        "raw_delta_power_ratio_pct": _power_ratio_percent(signal_l2, raw_delta_l2),
+        "delivered_support": delivered_support,
+        "delivered_support_k": delivered_support_k,
+        "delivered_min_scale": None if first_success is None else float(first_success["min_scale"]),
+        "delivered_delta_l2": delivered_delta_l2,
+        "delivered_delta_linf": delivered_delta_linf,
+        "delivered_delta_power_ratio_pct": delivered_power_ratio_pct,
         "dominant_channel": int(np.argmax(delta_channel_energy)),
         "first_success_k": None if first_success is None else int(first_success["k"]),
         "first_success_min_l2": None if first_success is None else float(first_success["min_delta_l2"]),
+        "first_success_min_power_ratio_pct": delivered_power_ratio_pct,
         "prefix_rows": prefix_rows,
     }
 
@@ -253,6 +293,7 @@ def _summarize_variant(
     n_success = int(sum(int(row["success"]) for row in report_rows))
 
     channel_counts = np.zeros((n_channels,), dtype=np.int64)
+    delivered_channel_counts = np.zeros((n_channels,), dtype=np.int64)
     prefix_correct_counts = np.zeros((k_max,), dtype=np.int64)
     prefix_l2_sums = np.zeros((k_max,), dtype=np.float64)
     prefix_linf_sums = np.zeros((k_max,), dtype=np.float64)
@@ -261,11 +302,29 @@ def _summarize_variant(
     prefix_min_linf_success_sums = np.zeros((k_max,), dtype=np.float64)
     prefix_min_power_ratio_pct_success_sums = np.zeros((k_max,), dtype=np.float64)
     prefix_success_counts = np.zeros((k_max,), dtype=np.int64)
+    delivered_support_ks = []
+    delivered_power_ratio_pcts = []
+    raw_power_ratio_pcts = []
 
     for result_row in report_rows:
         for atom in result_row["support"]:
             channel = _channel_index_from_atom(tuple(atom) if isinstance(atom, list) else atom)
             channel_counts[channel] += 1
+        for atom in result_row.get("delivered_support", []):
+            channel = _channel_index_from_atom(tuple(atom) if isinstance(atom, list) else atom)
+            delivered_channel_counts[channel] += 1
+        if result_row.get("delivered_support_k") is not None:
+            delivered_support_ks.append(int(result_row["delivered_support_k"]))
+        if result_row.get("delivered_delta_power_ratio_pct") is not None:
+            delivered_power_ratio_pcts.append(float(result_row["delivered_delta_power_ratio_pct"]))
+        raw_power_ratio_pcts.append(
+            float(
+                result_row.get(
+                    "raw_delta_power_ratio_pct",
+                    _power_ratio_percent(float(result_row["signal_l2"]), float(result_row["delta_l2"])),
+                )
+            )
+        )
         prefix_rows = result_row["prefix_rows"]
         signal_l2 = float(result_row["signal_l2"])
         if not prefix_rows:
@@ -321,6 +380,27 @@ def _summarize_variant(
     if zero_accuracy_rows:
         power_ratio_zero_accuracy = float(zero_accuracy_rows[0]["avg_min_power_ratio_pct_zero_accuracy"])
 
+    delivered_support_counts = {
+        str(k): int(sum(1 for value in delivered_support_ks if value == k))
+        for k in sorted(set(delivered_support_ks))
+    }
+    adaptive_channel_summary = {
+        "mean": None if not delivered_support_ks else float(np.mean(delivered_support_ks)),
+        "median": None if not delivered_support_ks else float(np.median(delivered_support_ks)),
+        "max": None if not delivered_support_ks else int(max(delivered_support_ks)),
+        "counts": delivered_support_counts,
+    }
+    delivered_power_ratio_summary = {
+        "mean": None if not delivered_power_ratio_pcts else float(np.mean(delivered_power_ratio_pcts)),
+        "median": None if not delivered_power_ratio_pcts else float(np.median(delivered_power_ratio_pcts)),
+        "max": None if not delivered_power_ratio_pcts else float(max(delivered_power_ratio_pcts)),
+    }
+    raw_power_ratio_summary = {
+        "mean": None if not raw_power_ratio_pcts else float(np.mean(raw_power_ratio_pcts)),
+        "median": None if not raw_power_ratio_pcts else float(np.median(raw_power_ratio_pcts)),
+        "max": None if not raw_power_ratio_pcts else float(max(raw_power_ratio_pcts)),
+    }
+
     report_rows.sort(key=lambda row: int(row["idx"]))
     return {
         "variant_name": variant_name,
@@ -336,8 +416,12 @@ def _summarize_variant(
         "attacked_accuracy": float((n_candidates - n_success) / max(n_candidates, 1)),
         "k_zero_accuracy": k_zero_accuracy,
         "power_ratio_zero_accuracy_pct": power_ratio_zero_accuracy,
+        "adaptive_channel_summary": adaptive_channel_summary,
+        "delivered_power_ratio_pct_summary": delivered_power_ratio_summary,
+        "raw_power_ratio_pct_summary": raw_power_ratio_summary,
         "prefix_summary": prefix_summary,
         "selected_channel_counts": channel_counts.tolist(),
+        "delivered_channel_counts": delivered_channel_counts.tolist(),
         "per_sample": report_rows,
     }
 
@@ -367,11 +451,15 @@ def _run_variant(
 
     if n_workers == 1:
         model, device, _ = load_eegnet_checkpoint(str(out_cfg.baseline_model_path), device=worker_device)
+        for parameter in model.parameters():
+            parameter.requires_grad_(False)
         try:
-            global _GLOBAL_SCORE_FN, _GLOBAL_BASELINE_CFG, _GLOBAL_ATTACK_CFG
+            global _GLOBAL_SCORE_FN, _GLOBAL_BASELINE_CFG, _GLOBAL_ATTACK_CFG, _GLOBAL_MODEL, _GLOBAL_DEVICE
             _GLOBAL_SCORE_FN = make_score_fn(model, device)
             _GLOBAL_BASELINE_CFG = baseline_cfg
             _GLOBAL_ATTACK_CFG = variant["config"]
+            _GLOBAL_MODEL = model
+            _GLOBAL_DEVICE = device
             for order, task in enumerate(candidate_payloads, start=1):
                 _consume(_attack_one_sample(task), order)
         finally:
@@ -475,6 +563,8 @@ def _rerun_attack_for_sample(
     attack_cfg: AttackConfig,
     baseline_cfg: BaselineConfig,
     score_fn,
+    model=None,
+    device=None,
 ) -> dict:
     attack = build_score_attack(
         score_fn=score_fn,
@@ -506,6 +596,8 @@ def _rerun_attack_for_sample(
         enforce_unique_channels=attack_cfg.enforce_unique_channels,
         stop_on_success=attack_cfg.stop_on_success,
         seed=baseline_cfg.random_seed + sample_idx,
+        model=model,
+        device=device,
     )
     result = attack.run(x_np, y_int)
     adv_scores = score_fn(result.x_adv)
@@ -641,6 +733,8 @@ def run_attack_basis_comparison() -> dict:
             attack_cfg=variant["config"],
             baseline_cfg=baseline_cfg,
             score_fn=score_fn,
+            model=model,
+            device=device,
         )
         variant_examples.append(
             {

@@ -1,39 +1,101 @@
 \relax 
 \citation{song2022eegconformer}
-\citation{feng2021saga}
-\citation{croce2019sparse}
-\citation{croce2019sparse}
-\citation{croce2019sparse}
 \@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {II}Channel-Sparse Attack Formulation}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Signal Model and Threat Model}{1}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}The Channel-$l_0$ and $l_\infty $ Attack}{1}{}\protected@file@percent }
-\newlabel{eq:l0}{{1}{1}}
-\newlabel{eq:attack}{{2}{1}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Waveform Basis and the Combined Problem}{1}{}\protected@file@percent }
-\citation{spall1992spsa}
+\citation{zhang2021tiny,wu2023adversarial}
+\citation{liu2021uap}
+\citation{feng2021saga}
+\citation{qian2025qeldba}
+\citation{meng2024adversarialfilter}
+\citation{wang2022physical}
+\citation{yi2024tfattack}
+\citation{szegedy2014intriguing,goodfellow2015explaining}
+\citation{papernot2017practical,chen2017zoo}
 \citation{croce2019sparse}
-\newlabel{eq:basis}{{3}{2}}
-\newlabel{eq:parameterization}{{4}{2}}
-\newlabel{eq:attack_A}{{5}{2}}
-\@writefile{toc}{\contentsline {section}{\numberline {III}Attack Algorithm}{2}{}\protected@file@percent }
-\newlabel{eq:channel_waveform_form}{{6}{2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Greedy Channel Selection}{2}{}\protected@file@percent }
-\newlabel{eq:clean_winner}{{7}{2}}
-\newlabel{eq:attack_score}{{8}{2}}
-\newlabel{eq:greedy}{{9}{2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}SPSA Coefficient Refinement}{2}{}\protected@file@percent }
-\newlabel{eq:spsa_objective}{{10}{2}}
-\newlabel{eq:spsa_grad}{{11}{2}}
-\newlabel{eq:spsa_update}{{12}{2}}
-\@writefile{toc}{\contentsline {section}{\numberline {IV}Discussion}{2}{}\protected@file@percent }
+\citation{zhang2021tiny,liu2021uap}
+\citation{feng2021saga}
+\citation{wang2022physical}
+\citation{meng2024adversarialfilter}
+\citation{yi2024tfattack}
+\citation{qian2025qeldba}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Dense EEG Adversarial Attacks}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Sparse EEG Attacks}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Black-Box EEG Attacks}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Time-Frequency and Physically Constrained EEG Attacks}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-E}}Sparse Attacks in Vision}{2}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {III}Threat Model and Attack Objective}{2}{}\protected@file@percent }
+\citation{croce2019sparse}
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Representative EEG adversarial attacks and how their threat models differ from SCS. ``Score-only'' means the search uses classifier scores but not gradients or model parameters.}}{3}{}\protected@file@percent }
+\newlabel{tab:eeg_attack_landscape}{{I}{3}}
+\newlabel{eq:margin}{{2}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}Perturbation Unit and Amplitude Constraint}{3}{}\protected@file@percent }
+\newlabel{eq:peak_ratio}{{4}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Sparse-Channel Attack Objective}{3}{}\protected@file@percent }
+\newlabel{eq:attack_problem}{{5}{3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}Attack Metrics}{3}{}\protected@file@percent }
+\newlabel{eq:first_success}{{6}{3}}
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Sparse-Channel Search}{4}{}\protected@file@percent }
+\newlabel{sec:scs}{{IV}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Waveform Parameterization}{4}{}\protected@file@percent }
+\newlabel{eq:basis}{{7}{4}}
+\newlabel{eq:basis_hat}{{8}{4}}
+\newlabel{eq:basis_trend}{{9}{4}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces Example 10\nobreakspace  {}Hz oscillatory atom over a 4-second HBN window. Without tapering, the finite-window cosine turns on and off abruptly at the segment boundaries. Multiplying by a Hanning window preserves the EEG-band oscillation while making the atom enter and exit smoothly, which is why SCS uses tapered atoms for waveform search.}}{4}{}\protected@file@percent }
+\newlabel{fig:oscillatory_atom_taper}{{1}{4}}
+\newlabel{eq:parameterization}{{10}{4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Score Objective}{4}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Population Channel Ranking}{4}{}\protected@file@percent }
+\citation{spall1992spsa}
+\citation{spall1992spsa}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-C}0a}Probe set and channel leverage.}{5}{}\protected@file@percent }
+\newlabel{eq:leverage}{{12}{5}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-C}0b}Population score and ranking.}{5}{}\protected@file@percent }
+\newlabel{eq:pop_leverage}{{13}{5}}
+\@writefile{toc}{\contentsline {paragraph}{\numberline {\mbox  {IV-C}0c}How many probes are enough?}{5}{}\protected@file@percent }
+\newlabel{eq:nstar}{{15}{5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}SPSA Refinement}{5}{}\protected@file@percent }
+\newlabel{subsec:spsa}{{\mbox  {IV-D}}{5}}
+\newlabel{eq:spsa_grad}{{17}{5}}
+\newlabel{eq:spsa_update}{{18}{5}}
+\citation{song2022eegconformer}
+\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Sparse-Channel Search (SCS)}}{6}{}\protected@file@percent }
+\newlabel{alg:channel_sparse_attack}{{1}{6}}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Experimental Setup}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Dataset, Model, and Preprocessing}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Attack Parameters}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Metrics and Baselines}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Results}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-A}}Clean Recognition Under Subject Scaling}{6}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-B}}SCS Remains Effective as Identities Increase}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {VI-C}}Reference Attack Comparison on BNCI2014\_001}{7}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {VII}Discussion}{7}{}\protected@file@percent }
 \bibstyle{IEEEtran}
+\bibdata{refs}
 \bibcite{song2022eegconformer}{1}
-\bibcite{feng2021saga}{2}
-\bibcite{spall1992spsa}{3}
-\bibcite{croce2019sparse}{4}
-\@writefile{loa}{\contentsline {algorithm}{\numberline {1}{\ignorespaces Channel-Sparse Black-Box Attack}}{3}{}\protected@file@percent }
-\newlabel{alg:channel_sparse_attack}{{1}{3}}
-\@writefile{toc}{\contentsline {section}{\numberline {V}Conclusion}{3}{}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{References}{3}{}\protected@file@percent }
-\gdef \@abspage@last{3}
+\bibcite{zhang2021tiny}{2}
+\bibcite{wu2023adversarial}{3}
+\bibcite{liu2021uap}{4}
+\bibcite{feng2021saga}{5}
+\bibcite{qian2025qeldba}{6}
+\bibcite{meng2024adversarialfilter}{7}
+\bibcite{wang2022physical}{8}
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces HBN R1 subject-count sweep for EEGConformer. All runs use 64 EEG channels, passive-task training, active-task validation, and the same SCS configuration. ASR is the fraction of clean-correct validation trials whose decision changes within the attack budget. Attacked accuracy is computed on the attacked clean-correct trials. Mean and median $k^\star $ are computed over successful attacks. A dash in $K100$ means SCS did not reach 100\% prefix ASR within the 12-channel budget.}}{8}{}\protected@file@percent }
+\newlabel{tab:hbn_subject_sweep}{{II}{8}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Summary of the HBN subject-count sweep. As the enrolled identity set grows, clean recognition becomes harder: accuracy decreases and EER increases. SCS remains high-success, and the mean/median first-success channel count stays low.}}{8}{}\protected@file@percent }
+\newlabel{fig:hbn_scaling_dashboard}{{2}{8}}
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Reference attack comparison on BNCI2014\_001 subject recognition. The SAGA row is a paper-guided sparse channel-time PGD reconstruction included for comparison with a representative sparse EEG attack; it is not an official upstream implementation. Mean, median, and max $k^\star $ are computed over successful trials.}}{8}{}\protected@file@percent }
+\newlabel{tab:bnci_attack_comparison}{{III}{8}}
+\@writefile{toc}{\contentsline {section}{\numberline {VIII}Conclusion}{8}{}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{References}{8}{}\protected@file@percent }
+\bibcite{yi2024tfattack}{9}
+\bibcite{szegedy2014intriguing}{10}
+\bibcite{goodfellow2015explaining}{11}
+\bibcite{papernot2017practical}{12}
+\bibcite{chen2017zoo}{13}
+\bibcite{croce2019sparse}{14}
+\bibcite{spall1992spsa}{15}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Cumulative prefix ASR as the number of controlled channels increases. The curves show that successful attacks accumulate quickly for every subject-count setting, with most runs approaching or crossing 95\% ASR before the 12-channel budget.}}{9}{}\protected@file@percent }
+\newlabel{fig:hbn_prefix_success}{{3}{9}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces Distribution of the first-success channel count. Each row sums the first-success attacks for one HBN subject-count run as a percentage of attacked clean-correct trials. The mass remains concentrated in the first few channels even for the 122-subject recognizer.}}{9}{}\protected@file@percent }
+\newlabel{fig:hbn_first_success_heatmap}{{4}{9}}
+\gdef \@abspage@last{9}

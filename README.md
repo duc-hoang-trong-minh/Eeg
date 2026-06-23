@@ -114,6 +114,7 @@ Notes:
 - The second command uses all eligible R1 subjects unless `EEG_HBN_MAX_SUBJECTS` is set.
 - HBN is used for subject-ID recognition with a passive-task train split and active-task validation split.
 - Set `EEG_HBN_CHANNEL_LIMIT=64` to train on channels `E1`-`E64` when you want a smaller feature surface.
+- Set `EEG_HBN_OUTPUT_ROOT=/path/to/output` to keep a run isolated from the default `outputs/hbn_r1_l100_human_recognition` folder.
 
 ## Run HBN R1-L100 biometric evaluation
 
@@ -134,14 +135,101 @@ python -m src.run_human_recognition_attack_comparison
 
 Notes:
 - Reuses the saved human-recognition checkpoint in `outputs/bnci2014_001_human_recognition/`.
-- Compares sparse channel + hybrid waveform against sparse channel-time + hybrid waveform.
+- Compares sparse channel + hybrid waveform, sparse channel-time + hybrid waveform, and a SAGA-style sparse channel-time PGD baseline.
 - Defaults to a balanced capped subset of clean-correct validation trials for runtime; override with `EEG_ATTACK_MAX_SAMPLES`.
+- To run only the SAGA-style baseline, set `EEG_ATTACK_VARIANTS=human_saga_pgd`.
+- The SAGA variant is a paper-guided white-box reconstruction from the public abstract/metadata, not a vendored upstream implementation.
+
+## Run attack basis comparison
+
+```bash
+python -m src.run_attack_basis_comparison
+```
+
+Notes:
+- Compares unrestricted hybrid basis, restricted frequency bank, channel-then-window hybrid basis, and a SAGA-style sparse channel-time PGD baseline.
+- To run only the SAGA-style baseline, set `EEG_ATTACK_VARIANTS=saga_pgd`.
+
+## Run full SAGA comparison
+
+```bash
+python -m src.run_full_saga_comparison
+```
+
+Or use the shell wrapper:
+
+```bash
+bash run_full_saga_comparison.sh
+```
+
+Notes:
+- Runs the basis comparison, the BNCI human-recognition comparison, and the HBN comparison when `EEG_HBN_PATH` is set.
+- Do not append `.sh` to the `python -m` command; that name is the Python module entrypoint.
 
 For the HBN checkpoint:
 
 ```bash
 python -m src.run_hbn_human_recognition_attack_comparison
 ```
+
+Recent sparse-channel HBN result:
+- Fresh HBN R1-L100 sparse-channel hybrid rerun: `outputs/hbn_r1_l100_human_recognition/hbn_k12_first_success_channel_summary.json`.
+- Model/task: EEGConformer subject recognition, task-holdout HBN split, 50 subjects, 64 EEG channels.
+- Attack setting: channel-first hybrid waveform, `support_budget_k=12`, `max_outer_iters=12`, `max_query_budget=45000`, 10% peak-ratio cap.
+- Sample set: 64 balanced clean-correct validation samples, drawn from 19,993 clean-correct HBN validation windows.
+- Result: 64/64 attack success. The average first successful channel count was 3.671875 channels, median 3, min 1, max 12.
+- First-success channel distribution: 1 channel: 14 samples; 2: 14; 3: 12; 4: 5; 5: 6; 6: 3; 7: 1; 8: 5; 9: 2; 12: 2.
+- Prefix success: K=8 flipped 93.75%, K=9 flipped 96.875%, and K=12 flipped 100%.
+
+Comparison to the older 9-subject BNCI2014_001 run:
+- BNCI2014_001 artifact: `outputs/bnci2014_001_human_recognition/human_recognition_attack_basis_comparison_report.json`.
+- BNCI setting: EEGConformer subject recognition, cross-session split, 9 subjects, 22 EEG channels, 10 attacked clean-correct samples.
+- BNCI attack setting: channel-first hybrid waveform, `support_budget_k=8`, 5% peak-ratio cap, `max_query_budget=25000`, default regularization.
+- BNCI result: 8/10 attack success by K=8. Among successful samples, first success averaged 2.5 channels with median 2; two samples did not flip within the K=8 budget.
+- The HBN result is therefore stronger in final success rate, but it is not a pure dataset-only comparison: HBN used a larger search/perturbation budget, more available channels, and weaker regularization. It also attacks a 50-subject task-holdout identity model where subject-specific cues can be spread across many electrodes; the greedy search has more possible channels to exploit. BNCI2014_001 has only 22 channels and was attacked under a stricter K=8/5% cap, so the older result should be treated as a stricter, smaller-dataset reference point rather than a direct control.
+
+## Run HBN subject-count sweep
+
+```bash
+python -m src.run_hbn_subject_sweep
+```
+
+Default sweep:
+- Uses HBN R1-L100-BDF only; no R2-R11 download is required.
+- Subject counts: `20, 35, 50, 75, 100, 122`.
+- Output root: `outputs/hbn_subject_sweep/`, with one isolated folder per count (`n020`, `n035`, ...).
+- Fixed channels: `E1`-`E64`.
+- Attack setting: sparse channel + hybrid waveform, `K=12`, 10% peak-ratio cap, `max_query_budget=45000`.
+- Attack sample count defaults to `min(128, max(64, subject_count))`.
+
+Useful variants:
+
+```bash
+# Verify commands and output roots without running training or attack.
+python -m src.run_hbn_subject_sweep --dry-run --subject-counts 20
+
+# Run only the 122-subject count.
+python -m src.run_hbn_subject_sweep --subject-counts 122
+
+# Rebuild only the cross-run summary plot/table from completed run folders.
+python -m src.plot_hbn_subject_sweep --root outputs/hbn_subject_sweep
+
+# Run added architecture-validation sweeps in isolated model folders.
+python -m src.run_hbn_subject_sweep \
+  --root outputs/hbn_model_sweep \
+  --model-names EEGNet ShallowFBCSPNet
+
+# Rebuild a multi-model summary plot/table.
+python -m src.plot_hbn_subject_sweep --root outputs/hbn_model_sweep
+```
+
+Outputs:
+- `outputs/hbn_subject_sweep/hbn_subject_count_channel_control_summary.csv`
+- `outputs/hbn_subject_sweep/hbn_subject_count_channel_control_summary.json`
+- `outputs/hbn_subject_sweep/hbn_subject_count_channel_control.png`
+
+The summary reports clean validation accuracy, biometric EER, attack success, mean/median first-success channel count, bootstrap confidence intervals, and `K90`/`K95`/`K100`. Treat the subject-count correlation as exploratory because it has six nested HBN R1 points, not independent datasets.
+For multi-model runs, the summary CSV includes `model_name`, and the plot overlays mean first-success channels by architecture.
 
 ## Run human-recognition biometric evaluation
 

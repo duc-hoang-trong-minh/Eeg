@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-from braindecode.models import EEGConformer
+from braindecode.models import EEGConformer, ShallowFBCSPNet
 try:
     from braindecode.models import EEGNet
 except ImportError:  # pragma: no cover - compatibility with older braindecode releases
@@ -24,6 +24,12 @@ def load_baseline_checkpoint(path: str, device: str | None = None):
         ).to(torch_device)
     elif model_name == "EEGConformer":
         model = EEGConformer(
+            n_chans=int(checkpoint["n_chans"]),
+            n_outputs=int(checkpoint["n_classes"]),
+            n_times=int(checkpoint["input_window_samples"]),
+        ).to(torch_device)
+    elif model_name == "ShallowFBCSPNet":
+        model = ShallowFBCSPNet(
             n_chans=int(checkpoint["n_chans"]),
             n_outputs=int(checkpoint["n_classes"]),
             n_times=int(checkpoint["input_window_samples"]),

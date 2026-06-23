@@ -1,0 +1,447 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,bm}
+\usepackage{array,booktabs,longtable}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+\newtheorem{assumption}{Assumption}
+
+\title{\textbf{SCS --- Internal Technical Spec}\\[2pt]
+\large Score-only sparse-electrode attack on EEG recognition}
+\author{}
+\date{Internal. Edit this first; the manuscript follows it.}
+
+\begin{document}
+\maketitle
+\vspace{-3em}
+
+%====================================================================
+\section{Question}
+
+\paragraph{Question.} Under \emph{score-only} access (the adversary sees class
+logits, not gradients or weights), how few \emph{complete electrode traces} must be
+controlled to flip an EEG subject-recognition decision using only EEG-band waveforms,
+and \emph{what quantity governs that number}? The question is open because dense,
+white-box, and channel-time attacks do not measure whole-channel cost, and because the
+\emph{mechanism} behind a small count --- not just its value --- is unknown.
+
+%====================================================================
+\section{Setup and notation}
+
+All objects are typed before use. The trial index is carried on every per-trial
+object; it is dropped only for \emph{operators} whose value does not depend on which
+trial they act on (the margin and the waveform map).
+
+\paragraph{Notation typography rule.}
+Scalars use ordinary italic or Greek letters, e.g.\ $c,k,t,\rho,\Delta,\nu$ and the
+declared scalar scores $F_c,\widehat F_c$. Vectors use bold lowercase, e.g.\
+$\mathbf{u}_j$ and $\mathbf{s}(\mathbf{E})$. Matrices or multichannel trials use bold
+uppercase, e.g.\ $\mathbf{X}_i$, $\mathbf{E}_i$, and $\mathbf{A}_i^{(k)}$. Sets use
+calligraphic uppercase, e.g.\ $\mathcal{D}$, $\mathcal{C}$, $\mathcal{B}$, and
+$\mathcal{S}^{(k)}$. In particular, $s_c(\mathbf{E})$ is the scalar channel indicator,
+while $\mathcal{S}(\mathbf{E})$ is the corresponding channel set; $e_{i,c}^{(k)}(t)$ is
+a scalar waveform value, while $\mathbf{E}_{\mathcal{S}^{(k)},\mathbf{A}_i^{(k)}}$ is the
+full perturbation matrix.
+
+\paragraph{Indexing and dependency invariant.}
+Before any equation is accepted, every symbol must declare what it depends on, its
+size/shape, and the set or source it comes from. Indexing is one case of this rule: if the
+right-hand side depends on trial $i$, channel $c$, atom $m$, support size $k$, probe draw
+$j$, probe sample $q$, or optimization step $\ell$, then the left-hand side must expose
+that dependency. Table~\ref{tab:dependency-ledger} is the gate used for SCS notation.
+
+\paragraph{Data and model.}
+The dataset is $\mathcal{D}=\{(\mathbf{X}_i,y_i)\}_{i=1}^N$ with trials
+$\mathbf{X}_i\in\mathbb{R}^{C\times T}$, where $C$ is the number of electrode channels
+and $T$ is the number of samples. Let $\mathcal{C}:=\{1,\dots,C\}$ be the channel index
+set. Labels are $y_i\in[K]:=\{1,\dots,K\}$, and $i\in[N]$. The recognizer is a score map
+$f:\mathbb{R}^{C\times T}\to\mathbb{R}^{K}$ with prediction
+$\hat{y}(\mathbf{X})=\arg\max_{r\in[K]} f_r(\mathbf{X})$, using a fixed deterministic
+tie-break. The clean predicted identity of trial $i$ is $y_0^i=\hat{y}(\mathbf{X}_i)$.
+
+\paragraph{Data-use accounting.}
+The data are not one undifferentiated pool. The model-training split
+$\mathcal{D}_{\mathrm{train}}$ is used only to fit the recognizer $f$. The validation
+split $\mathcal{D}_{\mathrm{val}}$ is used to report clean accuracy/EER and to form the
+clean-correct pool
+$\mathcal{D}_{\mathrm{cc}}=\{(\mathbf{X},y)\in\mathcal{D}_{\mathrm{val}}:
+\hat y(\mathbf{X})=y\}$. Stage~1 uses a separate probe set
+$\mathcal{D}_{\mathrm{probe}}=\{\mathbf{Z}_q\}_{q=1}^{n}$ to estimate channel leverage.
+Stage~2 evaluates attacks on
+$\mathcal{D}_{\mathrm{attack}}\subseteq\mathcal{D}_{\mathrm{cc}}$. The final experiment
+must report both $n=|\mathcal{D}_{\mathrm{probe}}|$ and
+$|\mathcal{D}_{\mathrm{attack}}|$; ASR and $k^\star$ are computed only over
+$\mathcal{D}_{\mathrm{attack}}$, not over all validation windows.
+
+\begin{center}
+\footnotesize
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.22\textwidth}
+>{\raggedright\arraybackslash}p{0.28\textwidth}
+>{\raggedright\arraybackslash}p{0.42\textwidth}@{}}
+\toprule
+Object & Current HBN 122-subject artifact & Use \\
+\midrule
+$\mathcal{D}_{\mathrm{train}}$ & 785 passive-task recordings; 55,665 windows &
+train EEGConformer subject recognizer \\
+$\mathcal{D}_{\mathrm{val}}$ & 487 active-task recordings; 44,694 windows &
+report clean validation accuracy and biometric EER \\
+$\mathcal{D}_{\mathrm{cc}}$ & 35,042 clean-correct validation windows &
+candidate pool from which attack trials are drawn \\
+$\mathcal{D}_{\mathrm{attack}}$ & 122 clean-correct windows, capped by
+\texttt{attack\_max\_samples=122} & report ASR, attacked accuracy, and
+first-success channel count $k^\star$ \\
+$\mathcal{D}_{\mathrm{probe}}$ & not yet regenerated for the population Stage~1 artifact &
+estimate $F_c$ and $\widehat F_c$ for the shared channel ranking \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Margin (operator).}
+For any $\mathbf{X}\in\mathbb{R}^{C\times T}$, $y\in[K]$,
+\begin{equation}
+M(\mathbf{X},y)=f_y(\mathbf{X})-\max_{r\neq y} f_r(\mathbf{X}).
+\end{equation}
+The clean decision on trial $i$ is correct iff $M(\mathbf{X}_i,y_0^i)>0$; a non-targeted
+attack on trial $i$ succeeds once $M(\mathbf{X}_i+\mathbf{E}_i,y_0^i)<0$.
+
+\paragraph{Perturbation, support, budget.}
+The perturbation chosen for trial $i$ is $\mathbf{E}_i\in\mathbb{R}^{C\times T}$ (a
+per-trial solution, hence indexed). The channel-support indicator is
+\[
+s_c(\mathbf{E})=\mathbf{1}\{\|\mathbf{E}_{c,:}\|_2>0\},\qquad c\in\mathcal{C},
+\]
+with vector $\mathbf{s}(\mathbf{E})\in\{0,1\}^{C}$. The activated channel set, when needed,
+is $\mathcal{S}(\mathbf{E})=\{c\in\mathcal{C}:s_c(\mathbf{E})=1\}$, and the
+channel-count cost is $\sum_{c\in\mathcal{C}}s_c(\mathbf{E})$. The support is not fixed
+in advance --- $\mathcal{S}(\mathbf{E}_i)$ is whatever channels the solution activates.
+Each perturbation
+obeys the peak-ratio cap
+$\|\mathbf{E}_i\|_\infty\le r_{\max}\,\|\mathbf{X}_i\|_\infty$, $r_{\max}\in(0,1)$.
+
+\paragraph{Waveform basis.}
+Before either stage runs, we build a fixed waveform dictionary
+$\mathcal{B}=\{b_m\}_{m=1}^{r}$ for one EEG window. It is not learned from the model and
+not resampled during the attack. It is constructed from known signal-processing choices:
+the window length $T$, sampling rate $f_s$, Hanning taper $h(t)$, an EEG-band frequency
+grid, a grid of bump centers, and low-order trend degrees. Each atom
+$b_m:\{0,\dots,T-1\}\to\mathbb{R}$ is normalized to unit norm,
+$b_m=\tilde b_m/\|\tilde b_m\|_2$. The atom indices are partitioned into three families,
+$\mathcal{M}_{\mathrm{osc}}\cup\mathcal{M}_{\mathrm{hat}}\cup
+\mathcal{M}_{\mathrm{trend}}=[r]$, with sizes
+$r=r_{\mathrm{osc}}+r_{\mathrm{hat}}+r_{\mathrm{trend}}$. For oscillatory atoms, use a
+fixed product grid of frequencies and phases:
+$\mathcal{F}=\{f_a^{\mathrm{osc}}\}_{a=1}^{R_f}\subseteq[f_{\min},f_{\max}]$ and
+$\mathcal{G}_{\varphi}=\{\varphi_b\}_{b=1}^{R_\varphi}\subset S^1$. Each
+$m\in\mathcal{M}_{\mathrm{osc}}$ corresponds to one pair
+$(\alpha(m),\beta(m))\in[R_f]\times[R_\varphi]$. These are fixed dictionary coordinates,
+not random variables sampled during the attack:
+\begin{align}
+\text{(osc)}\quad   &\tilde b_m(t)=h(t)\cos(2\pi f_{\alpha(m)}^{\mathrm{osc}} t/f_s+\varphi_{\beta(m)}),
+&&m\in\mathcal{M}_{\mathrm{osc}};\\
+\text{(hat)}\quad   &\tilde b_m(t)=h(t)\max\!\big(1-|t/(T-1)-\mu_m|/w,\,0\big),
+&&m\in\mathcal{M}_{\mathrm{hat}};\\
+\text{(trend)}\quad &\tilde b_m(t)=h(t)\big(s(t)^{d_m}-\overline{s^{d_m}}\big),\ s(t)=\tfrac{2t}{T-1}-1,
+&&m\in\mathcal{M}_{\mathrm{trend}}.
+\end{align}
+For an active channel set $\mathcal{S}\subseteq\mathcal{C}$ and coefficient matrix
+$\mathbf{A}\in\mathbb{R}^{C\times r}$ with one row per global EEG channel, the induced
+perturbation operator uses the set indicator directly:
+\begin{equation}\label{eq:param}
+(\mathbf{E}_{\mathcal{S},\mathbf{A}})_{c,t}=
+\mathbf{1}\{c\in \mathcal{S}\}\sum_{m=1}^{r} a_{c,m}\,b_m(t).
+\end{equation}
+Here $\mathbf{A}$ is an operator argument. We keep it as a $C\times r$ matrix instead of a
+local $|\mathcal{S}|\times r$ matrix so row $c$ always means channel $c$. In Stage~2, the
+optimized coefficient matrix is trial-and-budget dependent, written $\mathbf{A}_i^{(k)}$,
+so the coefficient on trial $i$, channel $c$, atom $m$, and budget $k$ is
+$a_{i,c,m}^{(k)}$.
+
+\paragraph{Sub-Gaussian.}
+A real random variable $Y$ with mean $\mu$ is \emph{$\nu$-sub-Gaussian} if
+$\mathbb{E}\,e^{\lambda(Y-\mu)}\le e^{\lambda^2\nu^2/2}$ for all $\lambda\in\mathbb{R}$;
+then $\Pr(|Y-\mu|\ge\varepsilon)\le 2e^{-\varepsilon^2/(2\nu^2)}$, and the mean of $n$
+i.i.d.\ such variables is $(\nu/\sqrt n)$-sub-Gaussian.
+
+%====================================================================
+\section{Threat model objective}
+
+For each trial the ideal attack is the per-trial combinatorial program
+\begin{equation}\label{eq:ideal}
+\min_{\mathbf{E}_i\in\mathbb{R}^{C\times T}} \sum_{c\in\mathcal{C}}s_c(\mathbf{E}_i)
+\quad\text{s.t.}\quad M(\mathbf{X}_i+\mathbf{E}_i,y_0^i)<0,\;
+\|\mathbf{E}_i\|_\infty\le r_{\max}\|\mathbf{X}_i\|_\infty .
+\end{equation}
+The minimizer $\mathbf{E}_i^\star$ and its activated channel set
+$\mathcal{S}(\mathbf{E}_i^\star)$ depend on $\mathbf{X}_i$.
+SCS is a black-box heuristic for \eqref{eq:ideal}, not a certificate of its optimum.
+
+%====================================================================
+\section{Method: two-stage SCS}
+
+\subsection{Stage 1: population channel ranking}
+Let $P_{\mathrm{probe}}$ denote the distribution of probe trials available to the
+score-only attacker. Fix a finite probe set
+$\mathcal{D}_{\mathrm{probe}}=\{\mathbf{Z}_q\}_{q=1}^{n}$ with
+$\mathbf{Z}_q\stackrel{\mathrm{i.i.d.}}{\sim}P_{\mathrm{probe}}$. The set
+$\mathcal{D}_{\mathrm{probe}}$ is the sample used to estimate the ranking; it is not the
+distribution itself. Also fix a bank
+$\mathcal{P}=\{\mathbf{u}_1,\dots,\mathbf{u}_{J}\}$ of $J$ sign vectors
+$\mathbf{u}_j\in\{-1,+1\}^{r}$. The bank is sampled once, e.g.\ with independent
+Rademacher entries, and then held fixed for all channels and probe trials.
+
+For channel $c$ and probe direction $\mathbf{u}_j$, the unscaled single-channel probe is
+\[
+(\widetilde{\mathbf{E}}_{c,j})_{c',t}=
+\begin{cases}
+\rho\sum_{m=1}^{r}u_{j,m}b_m(t), & c'=c,\\
+0, & c'\neq c,
+\end{cases}
+\]
+where $\rho>0$ controls the probe amplitude. For any probe-distribution trial
+$\mathbf{X}$, define the capped probe
+$\mathbf{E}^{\mathrm{probe}}_{\mathbf{X},c,j}=\mathrm{Cap}_{\mathbf{X}}
+(\widetilde{\mathbf{E}}_{c,j})$, a deterministic rescaling to satisfy the peak-ratio cap.
+For the finite sample $\mathbf{Z}_q$, this becomes
+$\mathbf{E}^{\mathrm{probe}}_{\mathbf{Z}_q,c,j}$. Thus the basis $\{b_m\}$, channel $c$,
+and amplitude $\rho$ are fixed; the waveform randomness comes from the sampled sign
+vector $\mathbf{u}_j$, and the cap can make the final amplitude depend on the probe trial
+being evaluated.
+\begin{definition}[leverage]\label{def:lev}
+The leverage of channel $c$ on any probe-distribution trial $\mathbf{X}$ is the average
+single-channel margin drop over the probe bank,
+\[
+g_c(\mathbf{X})=M(\mathbf{X},\hat y(\mathbf{X}))-\frac{1}{J}\sum_{j=1}^{J}
+M\!\big(\mathbf{X}+\mathbf{E}^{\mathrm{probe}}_{\mathbf{X},c,j},\,\hat y(\mathbf{X})\big).
+\]
+It is an \emph{average} (a sample statistic), not a best case, so its population mean is
+estimable by a sample mean.
+\end{definition}
+The population and empirical leverages and the induced order are
+\[
+F_c=\mathbb{E}_{\mathbf{X}\sim P_{\mathrm{probe}}}[g_c(\mathbf{X})],\qquad
+\widehat F_c=\frac1n\sum_{q=1}^{n} g_c(\mathbf{Z}_q),\qquad
+\widehat\pi=\text{argsort}_{\downarrow}\,\widehat F,\qquad
+\pi^\star=\text{argsort}_{\downarrow}\,F,
+\]
+where $F_c$ is an expectation over the population distribution $P_{\mathrm{probe}}$ and
+$\widehat F_c$ is the sample mean over the finite set $\mathcal{D}_{\mathrm{probe}}$.
+All sorting uses a fixed deterministic tie-break. Here $\widehat\pi$ is the empirical
+order used by SCS and $\pi^\star$ is the population order used only for analysis. For a
+target support size $k<C$, the \emph{frontier gap} is
+$\Delta=F_{\pi^\star_k}-F_{\pi^\star_{k+1}}\ge 0$, and $\nu$ is the sub-Gaussian proxy of
+$g_c(\mathbf{X})$ for $\mathbf{X}\sim P_{\mathrm{probe}}$
+(Assumption~\ref{as:subg}).
+
+\paragraph{Assumptions for Claim~1.}
+The ranking bound rests on three assumptions. They are stated after the probe objects,
+leverage function, and expectation are defined, so every symbol in the assumptions has a
+declared dependency.
+\begin{assumption}[unbounded scores]\label{as:logits}
+The oracle returns logits in $\mathbb{R}^K$, not probabilities. Hence concentration
+must use a sub-Gaussian tail, not a bounded-range (Hoeffding) tail.
+\end{assumption}
+\begin{assumption}[independent probes]\label{as:indep}
+The finite probe trials $\mathbf{Z}_1,\ldots,\mathbf{Z}_n$ in
+$\mathcal{D}_{\mathrm{probe}}$ are independent draws from $P_{\mathrm{probe}}$; in
+practice this is approximated by taking one window per distinct recording.
+\end{assumption}
+\begin{assumption}[sub-Gaussian leverage]\label{as:subg}
+For each channel $c\in\mathcal{C}$, the random variable $g_c(\mathbf{X})$ with
+$\mathbf{X}\sim P_{\mathrm{probe}}$ is $\nu$-sub-Gaussian about its mean $F_c$. If it is
+only finite-variance, a Bernstein bound gives the same $1/\Delta^2$ rate with a larger
+constant.
+\end{assumption}
+
+\subsection{Stage 2: per-trial attack in fixed order}
+Fix a maximum channel budget $B<C$. For each $k\in\{1,\ldots,B\}$, the active channel set
+is the universal empirical prefix
+$\mathcal{S}^{(k)}=\{\widehat\pi_1,\dots,\widehat\pi_k\}$
+($|\mathcal{S}^{(k)}|=k$), \emph{identical across trials}: only the coefficients
+$\mathbf{A}_i^{(k)}$ and the realized count $k_i^\star$ are per-trial. For trial $i$ at
+budget $k$, the perturbation on selected channel $c$ is
+\[
+e_{i,c}^{(k)}(t)=\sum_{m=1}^{r} a_{i,c,m}^{(k)}b_m(t),\qquad c\in\mathcal{S}^{(k)}.
+\]
+The atoms $b_m$ are fixed across trials, but the coefficients $a_{i,c,m}^{(k)}$ are
+optimized for the particular trial $\mathbf{X}_i$ and selected set size $k$. Define the
+trial-and-budget objective
+\[
+J_i^{(k)}(\mathbf{A})=M(\mathbf{X}_i+\mathbf{E}_{\mathcal{S}^{(k)},\mathbf{A}},y_0^i).
+\]
+Stage~2 replaces the random probe coefficients from Stage~1 with optimized
+trial-specific coefficients. SPSA refines them using two score queries per iteration.
+At iteration $\ell$, with current coefficients $\mathbf{A}_{i,\ell}^{(k)}$, random sign
+matrix $\mathbf{U}_{i,\ell}^{(k)}$ supported only on rows in $\mathcal{S}^{(k)}$, and radius
+$d_\ell$, the SPSA estimate is
+\[
+\widehat{\mathbf{G}}_{i,\ell}^{(k)}
+=\frac{
+J_i^{(k)}(\mathbf{A}_{i,\ell}^{(k)}+d_\ell\mathbf{U}_{i,\ell}^{(k)})
+-J_i^{(k)}(\mathbf{A}_{i,\ell}^{(k)}-d_\ell\mathbf{U}_{i,\ell}^{(k)})
+}{2d_\ell}\,\mathbf{U}_{i,\ell}^{(k)}.
+\]
+The update is
+\[
+\mathbf{A}_{i,\ell+1}^{(k)}
+=\mathrm{Proj}_{\mathbf{X}_i,\mathcal{S}^{(k)}}\!\left(
+\mathbf{A}_{i,\ell}^{(k)}-q_\ell\widehat{\mathbf{G}}_{i,\ell}^{(k)}
+\right),
+\]
+with Spall schedules $d_\ell=d_0/(\ell+1)^{0.101}$, $q_\ell=q_0/\sqrt{\ell+1}$, and
+$\mathrm{Proj}_{\mathbf{X}_i,\mathcal{S}^{(k)}}$ enforcing the peak cap relative to
+$\mathbf{X}_i$ and zero rows outside $\mathcal{S}^{(k)}$. After the query budget for support size
+$k$ is spent, let $\mathbf{A}_i^{(k)}$ be the best coefficient matrix found for trial
+$i$ at that support size.
+
+\paragraph{Metric.} The adversarial trial returned for $\mathbf{X}_i$ at budget $k$ is
+\[
+\mathbf{X}_{i,\mathrm{adv}}^{(k)}
+=\mathbf{X}_i+\mathbf{E}_{\mathcal{S}^{(k)},\mathbf{A}_i^{(k)}}.
+\]
+The first-success count of trial $i$ is
+\[
+k_i^\star=\min\{k\in[B]:M(\mathbf{X}_{i,\mathrm{adv}}^{(k)},y_0^i)<0\},
+\]
+undefined if no $k\le B$ succeeds. The successful set is
+$\mathcal{I}^\star=\{i\in[N]:k_i^\star\ \text{is defined}\}$. Over this set we report ASR,
+mean/median of
+$\{k_i^\star\}_{i\in\mathcal{I}^\star}$, and the prefix-ASR knees $K90/K95/K100$.
+
+\paragraph{Dependency table for SCS.}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.18\textwidth}
+>{\raggedright\arraybackslash}p{0.30\textwidth}
+>{\raggedright\arraybackslash}p{0.23\textwidth}
+>{\raggedright\arraybackslash}p{0.19\textwidth}@{}}
+\caption{Index, dependency, shape, and source ledger for SCS notation.}
+\label{tab:dependency-ledger}\\
+\toprule
+Symbol & Depends on & Size/shape & Source or set \\
+\midrule
+\endfirsthead
+\toprule
+Symbol & Depends on & Size/shape & Source or set \\
+\midrule
+\endhead
+$i$ & none & scalar index & $[N]$ \\
+$c,c'$ & none & scalar channel index & $\mathcal{C}=\{1,\ldots,C\}$ \\
+$t$ & none & scalar time index & $\{0,\ldots,T-1\}$ \\
+$m$ & none & scalar atom index & $[r]$ \\
+$q$ & none & scalar probe-sample index & $[n]$ \\
+$j$ & none & scalar probe-direction index & $[J]$ \\
+$k$ & none & scalar support budget & $[B]$, with $B<C$ \\
+$\ell$ & none & scalar optimizer step & SPSA iteration set \\
+$\mathbf{X}_i$ & $i$ & $C\times T$ real matrix & $\mathcal{D}$ \\
+$y_i$ & $i$ & scalar label & $[K]$ \\
+$y_0^i$ & $i,\mathbf{X}_i,f$ & scalar predicted label & $[K]$ \\
+$\mathcal{D}_{\mathrm{train}}$ & HBN passive-task split & set of labeled trials/windows & subset of $\mathcal{D}$ \\
+$\mathcal{D}_{\mathrm{val}}$ & HBN active-task split & set of labeled trials/windows & subset of $\mathcal{D}$ \\
+$\mathcal{D}_{\mathrm{cc}}$ & $\mathcal{D}_{\mathrm{val}},f$ & set of clean-correct trials/windows & subset of $\mathcal{D}_{\mathrm{val}}$ \\
+$\mathcal{D}_{\mathrm{attack}}$ & $\mathcal{D}_{\mathrm{cc}},\text{attack sample cap}$ & finite attack-evaluation set & subset of $\mathcal{D}_{\mathrm{cc}}$ \\
+$f$ & trained model & map $\mathbb{R}^{C\times T}\to\mathbb{R}^K$ & score oracle \\
+$M(\mathbf{X},y)$ & $\mathbf{X},y,f$ & scalar margin & $\mathbb{R}$ \\
+$\mathbf{E}_i$ & $i,\mathbf{X}_i,y_0^i,f,r_{\max}$ & $C\times T$ real matrix & feasible perturbation set \\
+$s_c(\mathbf{E})$ & $\mathbf{E},c$ & scalar indicator & $\{0,1\}$ \\
+$\mathbf{s}(\mathbf{E})$ & $\mathbf{E}$ & $C$-vector & $\{0,1\}^{C}$ \\
+$\mathcal{S}(\mathbf{E})$ & $\mathbf{E}$ & channel subset & $2^{\mathcal{C}}$ \\
+$\mathcal{F}$ & $f_{\min},f_{\max},R_f$ & set of $R_f$ frequencies & $[f_{\min},f_{\max}]$ \\
+$\mathcal{G}_{\varphi}$ & $R_\varphi$ & set of $R_\varphi$ phases & $S^1$ \\
+$\alpha(m),\beta(m)$ & $m,\mathcal{M}_{\mathrm{osc}},\mathcal{F},\mathcal{G}_{\varphi}$ & pair of scalar grid indices & $[R_f]\times[R_\varphi]$ \\
+$b_m$ & $m,T,f_s,\mathcal{F},\mathcal{G}_{\varphi},\alpha,\beta,\text{dictionary grid}$ & length-$T$ unit-norm waveform & $\mathcal{B}$ \\
+$\mathbf{A}$ & operator argument & $C\times r$ coefficient matrix & one row per channel in $\mathcal{C}$ \\
+$\mathbf{E}_{\mathcal{S},\mathbf{A}}$ & $\mathcal{S},\mathbf{A},\mathcal{B}$ & $C\times T$ perturbation matrix & waveform operator image \\
+$P_{\mathrm{probe}}$ & attacker's probe source & distribution over trials & distributions on $\mathbb{R}^{C\times T}$ \\
+$\mathbf{Z}_q$ & $q,P_{\mathrm{probe}}$ & $C\times T$ real matrix & $\mathcal{D}_{\mathrm{probe}}$ \\
+$\mathcal{D}_{\mathrm{probe}}$ & $n,P_{\mathrm{probe}}$ & set of $n$ trials & finite probe sample \\
+$\mathbf{u}_j$ & $j,\text{probe-bank seed}$ & length-$r$ sign vector & $\{-1,+1\}^{r}$ \\
+$\mathcal{P}$ & $J,\text{probe-bank seed}$ & set of $J$ sign vectors & probe bank \\
+$\mathbf{E}^{\mathrm{probe}}_{\mathbf{X},c,j}$ & $\mathbf{X},c,j,\rho,r_{\max},\mathcal{B}$ & $C\times T$ perturbation matrix & capped single-channel probe \\
+$g_c(\mathbf{X})$ & $\mathbf{X},c,\mathcal{P},\rho,r_{\max},\mathcal{B},f$ & scalar margin drop & $\mathbb{R}$ \\
+$F_c$ & $c,P_{\mathrm{probe}},\mathcal{P},\rho,r_{\max},\mathcal{B},f$ & scalar population leverage & $\mathbb{R}$ \\
+$\widehat F_c$ & $c,\mathcal{D}_{\mathrm{probe}},\mathcal{P},\rho,r_{\max},\mathcal{B},f$ & scalar empirical leverage & $\mathbb{R}$ \\
+$\pi^\star$ & $F_1,\ldots,F_C$ & channel permutation & $\mathcal{C}^{C}$ \\
+$\widehat\pi$ & $\widehat F_1,\ldots,\widehat F_C$ & channel permutation & $\mathcal{C}^{C}$ \\
+$\mathcal{S}^{(k)}$ & $\widehat\pi,k$ & $k$-element channel subset & subsets of $\mathcal{C}$ \\
+$\mathbf{A}_{i,\ell}^{(k)}$ & $i,k,\ell,\mathbf{X}_i,y_0^i,\mathcal{S}^{(k)},\text{SPSA seed}$ & $C\times r$ coefficient matrix & SPSA state, zero outside $\mathcal{S}^{(k)}$ \\
+$\mathbf{A}_i^{(k)}$ & $i,k,\mathbf{X}_i,y_0^i,\mathcal{S}^{(k)},f,\text{query budget}$ & $C\times r$ coefficient matrix & best Stage~2 state \\
+$a_{i,c,m}^{(k)}$ & $i,c,m,k,\mathbf{A}_i^{(k)}$ & scalar coefficient & $\mathbb{R}$ \\
+$e_{i,c}^{(k)}(t)$ & $i,c,k,t,\mathbf{A}_i^{(k)},\mathcal{B}$ & scalar waveform value & $\mathbb{R}$ \\
+$J_i^{(k)}(\mathbf{A})$ & $\mathbf{A},i,k,\mathbf{X}_i,y_0^i,\mathcal{S}^{(k)},\mathcal{B},f$ & scalar objective value & $\mathbb{R}$ \\
+$\mathbf{U}_{i,\ell}^{(k)}$ & $i,k,\ell,\mathcal{S}^{(k)},\text{SPSA seed}$ & $C\times r$ sign/zero matrix & SPSA perturbation direction \\
+$\widehat{\mathbf{G}}_{i,\ell}^{(k)}$ & $i,k,\ell,J_i^{(k)},\mathbf{A}_{i,\ell}^{(k)},\mathbf{U}_{i,\ell}^{(k)},d_\ell$ & $C\times r$ matrix & SPSA gradient-like estimate \\
+$\mathbf{X}_{i,\mathrm{adv}}^{(k)}$ & $i,k,\mathbf{X}_i,\mathcal{S}^{(k)},\mathbf{A}_i^{(k)},\mathcal{B}$ & $C\times T$ real matrix & attacked trial \\
+$k_i^\star$ & $i,B,y_0^i,\{\mathbf{X}_{i,\mathrm{adv}}^{(k)}\}_{k=1}^{B},f$ & scalar or undefined & $\{1,\ldots,B\}$ when successful \\
+$\mathcal{I}^\star$ & $\{k_i^\star\}_{i=1}^{N}$ & trial-index subset & subsets of $[N]$ \\
+$\Delta$ & $F,\pi^\star,k$ & nonnegative scalar & $\mathbb{R}_{\ge 0}$ \\
+$\nu$ & $\{g_c(\mathbf{X}):c\in\mathcal{C},\mathbf{X}\sim P_{\mathrm{probe}}\}$ & nonnegative scalar proxy & sub-Gaussian parameter \\
+\bottomrule
+\end{longtable}
+\endgroup
+For example, $e_{i,c}^{(k)}(t)=\sum_m a_{i,c,m}^{(k)}b_m(t)$ passes because the left side
+shows the trial, channel, budget, and time dependencies. Writing $e_c(t)$ would fail
+because it hides the trial and budget dependence.
+
+%====================================================================
+\section{Claim 1 --- channel-ranking stability}
+
+\begin{theorem}\label{thm:rank}
+Condition on the fixed dictionary $\mathcal{B}$ and probe bank $\mathcal{P}$. Under
+Assumptions~\ref{as:indep}--\ref{as:subg}, fix $\delta\in(0,1)$ and a target size $k<C$
+with frontier gap $\Delta>0$. If
+\begin{equation}\label{eq:nstar}
+n\;\ge\;\frac{8\,\nu^2\,\log(2C/\delta)}{\Delta^2},
+\end{equation}
+then with probability at least $1-\delta$ the empirical top-$k$ set
+$\{\widehat\pi_1,\dots,\widehat\pi_k\}$ equals the population top-$k$ set
+$\{\pi^\star_1,\dots,\pi^\star_k\}$.
+\end{theorem}
+
+\begin{lemma}[deterministic separation]\label{lem:det}
+If $\max_{c\in\mathcal{C}}|\widehat F_c-F_c|<\Delta/2$, the empirical and population top-$k$ sets
+coincide.
+\end{lemma}
+\begin{proof}
+Let $a$ be any kept channel (population rank $\le k$) and $b$ any dropped channel (rank
+$>k$). By definition of $\Delta$, $F_a\ge F_{\pi^\star_k}\ge
+F_{\pi^\star_{k+1}}+\Delta\ge F_b+\Delta$. Then
+$\widehat F_a> F_a-\Delta/2\ge F_b+\Delta/2>\widehat F_b$. So every kept channel outranks
+every dropped channel empirically; the top-$k$ set is unchanged.
+\end{proof}
+
+\begin{proof}[Proof of Theorem~\ref{thm:rank}]
+Each $\widehat F_c=\frac1n\sum_{q=1}^{n} g_c(\mathbf{Z}_q)$ is a mean of $n$ independent
+(Assumption~\ref{as:indep}) $\nu$-sub-Gaussian (Assumption~\ref{as:subg}) terms, hence
+$\Pr(|\widehat F_c-F_c|\ge\varepsilon)\le 2e^{-n\varepsilon^2/(2\nu^2)}$. A union bound
+over the $C$ channels gives
+$\Pr(\max_{c\in\mathcal{C}}|\widehat F_c-F_c|\ge\varepsilon)\le
+2C\,e^{-n\varepsilon^2/(2\nu^2)}$.
+Take $\varepsilon=\Delta/2$; the right side is $\le\delta$ iff
+$n\ge 8\nu^2\log(2C/\delta)/\Delta^2$, which is \eqref{eq:nstar}. On that event
+Lemma~\ref{lem:det} applies, giving top-$k$ set recovery with probability $\ge1-\delta$.
+\end{proof}
+
+\paragraph{Insight (the transferable content).} The \emph{form} of \eqref{eq:nstar}, not
+the number $n$, is the result: probe cost grows as $\log C$ in the number of electrodes
+but as $1/\Delta^2$ in the frontier gap. Closely-ranked electrodes, not many electrodes,
+cost queries. A small $k_i^\star$ is not implied by the ranking theorem alone; it is
+evidence that the early high-$F_c$ electrodes are sufficient to flip many decisions once
+the order is stable.
+We therefore treat \eqref{eq:nstar} as a prediction: estimate empirical proxies for
+$\nu$ and $\Delta$ from probe data, then check that ranking agreement saturates near the
+predicted $n^\star$.
+
+%====================================================================
+\section*{Status (internal)}
+\small
+HBN sweep table/figures present but numbers are from the OLD per-trial greedy; regenerate
+under the population attack. Claim~1 confirmation (sweep $n$; ranking agreement vs $n$;
+overlay $n^\star$ from empirical proxies for $\nu,\Delta$; error bars) not yet run. BNCI reference
+comparison done. Open: whether to headline the law in the abstract; build the
+\texttt{notation.tex} \verb|\newcommand| ledger mirroring \S2.
+
+\end{document}
